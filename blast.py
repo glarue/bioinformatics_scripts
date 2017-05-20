@@ -12,7 +12,6 @@ import sys
 import subprocess
 import os
 import time
-from operator import itemgetter
 import argparse
 from multiprocessing import Pool, cpu_count
 from functools import partial
