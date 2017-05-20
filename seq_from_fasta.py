@@ -17,7 +17,6 @@ as headers. Otherwise, will output sequences on separate lines.
 import sys
 import argparse
 
-
 def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
     """
     Iterator which takes FASTA as input. Yields
@@ -68,9 +67,9 @@ def demarcate(string, left_margin, right_margin, separator='|'):
             stringList.insert(i, separator)
     return "".join(stringList)
 
-def revComp(seq):
-    revList = []
-    baseMap = {
+def reverse_complement(seq):
+    rev_list = []
+    base_map = {
         'A':'T',
         'T':'A',
         'C':'G',
@@ -79,9 +78,10 @@ def revComp(seq):
         'U':'T'
     }
     for c in seq:
-        revList.append(baseMap[c.upper()])
-    revSeq = ''.join(reversed(revList))
-    return revSeq
+        rev_list.append(base_map[c.upper()])
+    rev_seq = ''.join(reversed(rev_list))
+
+    return rev_seq
 
 def get_subseq(parent_seq, start, stop, flank=0):
     """
@@ -128,7 +128,7 @@ def seq_from_line(parent_seq, line):
     seq, l_flank, r_flank = get_subseq(
         parent_seq, info["start"], info["stop"], flank=FLANK)
     if info["strand"] == "-":
-        seq = revComp(seq)
+        seq = reverse_complement(seq)
     if FLANK:
         seq = demarcate(seq, l_flank, r_flank)
     return seq
@@ -202,6 +202,7 @@ if len(sys.argv) == 1:
 args = parser.parse_args()
 
 FASTA = args.FASTA_file
+FLANK = args.flank
 
 if args.info_file:
     input_type = 'file'
@@ -209,8 +210,6 @@ if args.info_file:
 else:
     input_type = 'direct'
     direct_args = args.sequence_information
-
-FLANK = args.flank
 
 if input_type == "file":
     info_dict = info_from_file(list_file)
