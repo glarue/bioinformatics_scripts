@@ -1,14 +1,30 @@
 #!/usr/bin/env python3
 
 """
-Program to BLAST fasta files against one another, and report
-back only those pairs for which each hit is a reciprocal
-best hit to the other in the pair.
+usage: reciprologs.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]]
+                      query subject {blastn,blastp,blastx,tblastn,tblastx}
 
-Depends upon blast.py
+Uses BLAST to find reciprocal best hits between two files.
+
+positional arguments:
+  query                 query file to be BLASTed
+  subject               subject file to be BLASTed
+  {blastn,blastp,blastx,tblastn,tblastx}
+                        type of BLAST program to run
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t THREADS, --threads THREADS
+                        number of CPU threads to use (overridden by -p)
+                        (default: 4)
+  -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
+                        run the BLAST step using multiple parallel processes;
+                        without specific input will use half available system
+                        CPUs (default: None)
+
+Depends on blast.py
 
 """
-
 import sys
 import subprocess
 import os

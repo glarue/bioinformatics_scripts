@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
 
 """
-Translates nucleotide sequence(s) into amino acid sequence(s)
-from a variety of input sources.
+usage: translator.py [-h] [-v {short,long}] [-p {1,2}] [-r] [sequence_input]
+
+Translate nucleotide sequence into amino acid sequence
+
+positional arguments:
+  sequence_input        sequence string or file containing sequence(s)
+                        (default: None)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v {short,long}, --verbosity {short,long}
+                        amino acid abbreviation length (e.g. Glu/Glutamine)
+                        (default: single)
+  -p {1,2}, --phase {1,2}
+                        change the phase of translation (default: 0)
+  -r, --reverse_complement
+                        reverse-complement the sequence before translation
+                        (default: False)
 
 """
-
 import sys
 import os
 import argparse

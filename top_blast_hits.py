@@ -1,4 +1,28 @@
 #!/usr/bin/env python3
+
+"""
+usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-d] [-s] [-m] blastout_file
+
+Reports the top n BLAST hits for each query in a blastout file
+
+positional arguments:
+  blastout_file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -n NUMBER_OF_HITS, --number_of_hits NUMBER_OF_HITS
+                        number of hits to report for each unique query
+                        (default: 1)
+  -d, --allow_duplicate_target_hits
+                        allow multiple hits to the same subject to be included
+                        (default: False)
+  -s, --sort_by_name    sort output by name rather than bitscore (default:
+                        False)
+  -m, --memory_efficient
+                        avoid reading entire dataset into memory at once, to
+                        increase memory efficiency (default: False)
+
+"""
 import sys
 from collections import defaultdict as dd
 import argparse

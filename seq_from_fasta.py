@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
 
 """
-Takes a list file and returns sequences from a FASTA file.
+usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK]
+                         FASTA_file
+                         [sequence_information [sequence_information ...]]
 
-Alternatively, can take a single list-file line as direct input.
+Retrieves sequences from a FASTA file using the following format: header
+strand start stop [label]. If >label< is provided, will output in FASTA format
+using >label< as header. Otherwise, outputs one sequence per line. If only
+>header< is provided, will return the entire header/sequence pair.
 
-List format:
+positional arguments:
+  FASTA_file            FASTA-formatted text file
+  sequence_information  header strand start stop [label]
 
-loc strand start stop [label]
-
-If <<label>> provided, will output to FASTA format using labels
-as headers. Otherwise, will output sequences on separate lines.
+optional arguments:
+  -h, --help            show this help message and exit
+  -f INFO_FILE, --info_file INFO_FILE
+                        File with information for sequences on separate lines.
+  --flank FLANK         Size of any desired flanking region around specified
+                        sequence(s)
 
 """
-
 import sys
 import argparse
 

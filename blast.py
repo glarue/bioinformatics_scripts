@@ -1,13 +1,30 @@
 #!/usr/bin/env python3
 
 """
-BLAST one FASTA file against another, automating a number
-of steps such as translation of input files and database creation.
+usage: blast.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]] [-n NAME]
+                query subject {blastn,blastp,blastx,tblastn,tblastx}
 
-Also allows for running the BLAST step in parallel (see help for info).
+BLAST one file against another
+
+positional arguments:
+  query                 query file to be BLASTed
+  subject               subject file to be BLASTed
+  {blastn,blastp,blastx,tblastn,tblastx}
+                        type of BLAST program to run
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t THREADS, --threads THREADS
+                        number of CPU threads to use (overridden if -p)
+                        (default: 4)
+  -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
+                        run the BLAST step using multiple parallel processes;
+                        without specific input will use half available system
+                        CPUs (default: None)
+  -n NAME, --name NAME  filename for results (otherwise, automatic) (default:
+                        None)
 
 """
-
 import sys
 import subprocess
 import os

@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 
 """
+usage: random_lines.py [-h] file n
+
 Retrieves a random sample of lines from a file.
 
-"""
+positional arguments:
+  file        Input file. If FASTA, will retrieve random header/sequence
+              pairs.
+  n           The size of the sample to retrieve.
 
+optional arguments:
+  -h, --help  show this help message and exit
+
+"""
 import sys
 import argparse
 import random
 from collections import deque
-
 
 def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
     """

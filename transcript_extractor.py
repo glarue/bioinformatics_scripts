@@ -1,13 +1,30 @@
 #!/usr/bin/env python3
 
 """
-Extract transcript/coding sequences from a gff/genome file combination
+usage: transcript_extractor.py [-h] [-t] [-e] [-i] [-v] genome annotation
+
+Extract transcript/coding sequences from an annotation + genome file
+combination
+
+positional arguments:
+  genome                genome file in FASTA format
+  annotation            annotation file in GFF[3]/GTF format
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -t, --translate       translate the output sequence (default: False)
+  -e, --exon            use exons instead of CDS entries to define coding
+                        sequence (default: False)
+  -i, --isoforms        allow multiple isoforms per gene, instead of only
+                        longest (default: False)
+  -v, --verbose_headers
+                        include coordinate info in output headers (default:
+                        False)
 
 """
-
 import sys
 import argparse
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 
 class GFFLineInfo(object):

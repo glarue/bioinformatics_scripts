@@ -6,7 +6,6 @@ args associated with any files generated to a log
 file in the directory where the files were made.
 
 """
-
 import sys
 import os
 from os import listdir
