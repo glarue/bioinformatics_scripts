@@ -247,7 +247,7 @@ def prep_blast(subject, query, blast_type):
     return subject, query
 
 
-def parallel_blast(subject, query, blast_type):
+def parallel_blast(subject, query, blast_type, out_name=None):
 
     pool = Pool(PARALLEL)
     blast = partial(local_blast, subject, blast_type)
@@ -275,10 +275,11 @@ def parallel_blast(subject, query, blast_type):
     chunk_list = '\n'.join(chunked)    
     print('[#] Query split into {} files:\n{}\n'
           .format(len(chunked), chunk_list))
-    quer = abbreviate(query)
-    subj = abbreviate(subject)
+    if out_name is None:
+        out_name = '{}-{}.{}.blast_results'.format(
+            abbreviate(query), abbreviate(subject), blast_type)
     filenames = [
-        '{}-{}.blast_results.{}.tmp'.format(quer, subj, i) 
+        '{}.{}.tmp'.format(out_name, i) 
         for i in range(1, len(chunked) + 1)
         ]
     results = pool.starmap(blast, zip(chunked, filenames))
@@ -364,7 +365,7 @@ SUBJECT = run_files['subject']
 QUERY = run_files['query']
 
 if not OUT_NAME:
-    OUT_NAME = '{}-{}_{}.blast_results'.format(
+    OUT_NAME = '{}-{}.{}.blast_results'.format(
         BLAST_TYPE,
         abbreviate(QUERY), 
         abbreviate(SUBJECT))
@@ -372,7 +373,7 @@ if not OUT_NAME:
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE)
 
 if PARALLEL:
-    pblast_out = parallel_blast(SUBJECT, QUERY, BLAST_TYPE)
+    pblast_out = parallel_blast(SUBJECT, QUERY, BLAST_TYPE, OUT_NAME)
     concatenate(OUT_NAME, pblast_out)
 else:
     blast_out = local_blast(

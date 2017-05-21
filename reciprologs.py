@@ -224,8 +224,8 @@ else:
 fw_names = [abbreviate(QUERY), abbreviate(SUBJECT)]
 rv_names = fw_names[::-1]
 
-fw_fn = '{}-{}_{}.blast_results'.format(*fw_names, BLAST_TYPE)
-rv_fn = '{}-{}_{}.blast_results'.format(*rv_names, BLAST_TYPE)
+fw_fn = '{}-{}.{}.blast_results'.format(*fw_names, BLAST_TYPE)
+rv_fn = '{}-{}.{}.blast_results'.format(*rv_names, BLAST_TYPE)
 
 # create a list with the flags/options to pass to the subsequence
 # subprocess calls
@@ -253,7 +253,7 @@ else:
 # Filter for reciprocal best hits
 reciprologs = get_reciprocals(top_forward, top_reverse)
 
-out_file = "{}-{}_{}.reciprologs".format(
+out_file = "{}-{}.{}.reciprologs".format(
     abbreviate(QUERY), abbreviate(SUBJECT), BLAST_TYPE)
 with open(out_file, 'w') as out:
     for pair in reciprologs:
