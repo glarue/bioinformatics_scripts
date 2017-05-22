@@ -17,9 +17,9 @@ optional arguments:
   -i, --isoforms        allow multiple isoforms per gene, instead of only
                         longest (default: False)
   -c, --coord_based_isoforms
-                        detect isoforms by overlapping coordindates instead of
-                        shared parent (useful for annotations without gene
-                        entries) (default: False)
+                        detect isoforms by overlapping coordindates in
+                        addition to shared parent (useful for annotations 
+                        without gene entries) (default: False)
   -v, --verbose_headers
                         include coordinate info in output headers (default:
                         False)
@@ -399,16 +399,43 @@ def overlap_check(a, b):
     else:
         return False
 
-def longest_isoforms_by_coord(transcript_dict):
+# def longest_isoforms_by_coord(transcript_dict):
+#     """
+#     Identifies longest isoforms, and returns a dictionary.
+    
+#     """
+#     # identify longest isoforms
+#     # sort by length, then use overlap() function to determine if
+#     # subsequent transcripts are isoforms of longest version and skip
+#     # if they are.
+#     longest_isoforms = {}
+#     for region, transcripts in transcript_dict.items():
+#         if region not in longest_isoforms:
+#             longest_isoforms[region] = {}
+#         seen_coords = set()
+#         # sort by longest transcripts first
+#         for name, meta in sorted(transcripts.items(), 
+#         key=lambda x: coding_length(x[1]['children']), reverse=True):
+#             coords = meta['info']['coords']
+#             if not any(overlap_check(coords, c) for c in seen_coords):
+#                 length = coding_length(meta['children'])
+#                 meta['info']['length'] = length
+#                 longest_isoforms[region][name] = meta
+#             seen_coords.add(coords)
+            
+#     return longest_isoforms
+
+def longest_isoforms(transcript_dict, use_coords=False):
     """
     Identifies longest isoforms, and returns a dictionary.
     
     """
     # identify longest isoforms
-    # sort by length, then use overlap() function to determine if
-    # subsequent transcripts are isoforms of longest version and skip
-    # if they are.
+    # sort by length, then use either gene name or overlap() function 
+    # to determine if subsequent transcripts are isoforms of longest 
+    # version and skip if they are
     longest_isoforms = {}
+    seen_genes = set()
     for region, transcripts in transcript_dict.items():
         if region not in longest_isoforms:
             longest_isoforms[region] = {}
@@ -416,40 +443,47 @@ def longest_isoforms_by_coord(transcript_dict):
         # sort by longest transcripts first
         for name, meta in sorted(transcripts.items(), 
         key=lambda x: coding_length(x[1]['children']), reverse=True):
-            coords = meta['info']['coords']
-            if not any(overlap_check(coords, c) for c in seen_coords):
-                length = coding_length(meta['children'])
-                meta['info']['length'] = length
-                longest_isoforms[region][name] = meta
-            seen_coords.add(coords)
-            
-    return longest_isoforms
-
-def longest_isoforms_by_gene(transcript_dict):
-    """
-    Identifies longest isoforms, and returns a dictionary.
-    
-    """
-    # identify longest isoforms
-    # sort by length, then use overlap() function to determine if
-    # subsequent transcripts are isoforms of longest version and skip
-    # if they are.
-    longest_isoforms = {}
-    seen_genes = set()
-    for region, transcripts in transcript_dict.items():
-        if region not in longest_isoforms:
-            longest_isoforms[region] = {}
-        # sort by longest transcripts first
-        for name, meta in sorted(transcripts.items(), 
-        key=lambda x: coding_length(x[1]['children']), reverse=True):
             gene = meta['info']['parent']
             if gene not in seen_genes:
+                if use_coords:
+                    # skip those overlapping longer transcripts
+                    # even if they have unique gene name
+                    coords = meta['info']['coords']
+                    if any(overlap_check(coords, c) for c in seen_coords):
+                        seen_coords.add(coords)
+                        continue
                 seen_genes.add(gene)
                 length = coding_length(meta['children'])
                 meta['info']['length'] = length
                 longest_isoforms[region][name] = meta
     
     return longest_isoforms
+
+# def longest_isoforms_by_gene(transcript_dict):
+#     """
+#     Identifies longest isoforms, and returns a dictionary.
+    
+#     """
+#     # identify longest isoforms
+#     # sort by length, then use overlap() function to determine if
+#     # subsequent transcripts are isoforms of longest version and skip
+#     # if they are.
+#     longest_isoforms = {}
+#     seen_genes = set()
+#     for region, transcripts in transcript_dict.items():
+#         if region not in longest_isoforms:
+#             longest_isoforms[region] = {}
+#         # sort by longest transcripts first
+#         for name, meta in sorted(transcripts.items(), 
+#         key=lambda x: coding_length(x[1]['children']), reverse=True):
+#             gene = meta['info']['parent']
+#             if gene not in seen_genes:
+#                 seen_genes.add(gene)
+#                 length = coding_length(meta['children'])
+#                 meta['info']['length'] = length
+#                 longest_isoforms[region][name] = meta
+    
+#     return longest_isoforms
 
 
 ## old way, works
@@ -546,7 +580,7 @@ parser.add_argument(
 parser.add_argument(
     '-c',
     '--coord_based_isoforms',
-    help=('detect isoforms by overlapping coordindates instead of shared '
+    help=('detect isoforms by overlapping coordindates in addition to shared '
           'parent (useful for annotations without gene entries)'),
     action='store_true'
 )
@@ -591,10 +625,7 @@ if not child_found:
         sys.exit('[!] No {} entries found in annotation.'.format(child_type))
 
 if not ISOFORMS:
-    if FILTER_BY_COORDS:
-        transcripts = longest_isoforms_by_coord(transcripts)
-    else:
-        transcripts = longest_isoforms_by_gene(transcripts)
+    transcripts = longest_isoforms(transcripts, FILTER_BY_COORDS)
 
 seq_count = 0
 total_regions = len(transcripts)
