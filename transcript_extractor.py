@@ -93,6 +93,8 @@ class GFFLineInfo(object):
         
         """
         og_type = self.bits[2].lower()
+        if og_type == 'mrna':
+            og_type = 'transcript'
         if og_type in ('gene', 'transcript', 'exon', 'cds'):
             return og_type
 
