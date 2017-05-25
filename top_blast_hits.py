@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-d] [-s] [-m] blastout_file
+usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-d] [-s] [-m] blast_file
 
-Reports the top n BLAST hits for each query in a blastout file
+Reports the top n BLAST hits for each query in a (tabular) blast output file
 
 positional arguments:
-  blastout_file
+  blast_file
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -49,64 +49,78 @@ def get_runtime(start_time, p=5):
     rounded = round(run_time, p)
     return "{} {}".format(rounded, units)
 
-parser = argparse.ArgumentParser(description="Reports the top n BLAST hits "
-                                             "for each query in a blastout file",
-                                             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("blastout_file")
-parser.add_argument("-n", "--number_of_hits", type=int,
-                    help="number of hits to report for each unique query",
-                    default=1)
-parser.add_argument("-d", "--allow_duplicate_target_hits",
-                    action="store_true", default=False,
-                    help="allow multiple hits to the same subject to be included")
-parser.add_argument("-s", "--sort_by_name", action="store_true", default=False,
-                    help="sort output by name rather than bitscore")
-parser.add_argument("-m", "--memory_efficient", action="store_true", default=False,
-                    help="avoid reading entire dataset into memory at once, "
-                    "to increase memory efficiency")
+parser = argparse.ArgumentParser(
+    description="Reports the top n BLAST hits "
+                "for each query in a (tabular) blast output file",
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument("blast_file")
+parser.add_argument(
+    "-n", 
+    "--number_of_hits",
+    type=int,       
+    help="number of hits to report for each unique query",                
+    default=1)
+parser.add_argument(
+    "-d", 
+    "--allow_duplicate_target_hits",
+    action="store_true", 
+    default=False,
+    help="allow multiple hits to the same subject to be included")
+parser.add_argument(
+    "-s", 
+    "--sort_by_name", 
+    action="store_true", 
+    default=False,
+    help="sort output by name rather than bitscore")
+parser.add_argument(
+    "-m", 
+    "--memory_efficient", 
+    action="store_true", 
+    default=False,                   
+    help="avoid reading entire dataset into memory at once, "
+         "to increase memory efficiency")
+parser.add_argument(
+    '-r',
+    '--redundant_ids', 
+    action='store_true', 
+    default=False,
+    help='allow query and subject to share the same identifier')
+
+if len(sys.argv) == 1:
+    parser.print_help()
+    sys.exit(0)
 
 args = parser.parse_args()
 
 started = time.time()
 
 # Figure out what arguments we're working with
-BLASTFILE = args.blastout_file
+BLASTFILE = args.blast_file
 N = args.number_of_hits
 DUPES = args.allow_duplicate_target_hits
 NAME_SORT = args.sort_by_name
 MEM_REDUCE = args.memory_efficient
+REDUNDANT_IDS = args.redundant_ids
 
 # Dictionary to store hits for each query
 hitdict = dd(list)
 total_hits = 0
 
-# Do the data analysis at once or trimming as we go (~50% slower)
-if not MEM_REDUCE:
-    # fast
-    with open(BLASTFILE) as blast:
-        for hit in blast:
-            bits = hit.strip().split('\t')
-            query = bits[0]
-            subject = bits[1]
-            bitscore = float(bits[-1])
-            # Attach the bitscore and subject to allow for sorting at the end
-            index_tuple = (hit.strip(), bitscore, subject)
-            hitdict[query].append(index_tuple)
-            total_hits += 1
-
-else:
-    # slower
-    with open(BLASTFILE) as blast:
-        for hit in blast:
-            bits = hit.strip().split('\t')
-            query = bits[0]
-            subject = bits[1]
-            bitscore = float(bits[-1])
-            # Attach the bitscore and subject to allow for sorting at the end
-            index_tuple = (hit.strip(), bitscore, subject)
-            hitdict[query].append(index_tuple)
+# Do the data analysis at once or trimming as we go
+with open(BLASTFILE) as blast:
+    for hit in blast:
+        bits = hit.strip().split('\t')
+        query = bits[0]
+        subject = bits[1]
+        if query == subject and REDUNDANT_IDS is False:
+            continue
+        bitscore = float(bits[-1])
+        # Attach the bitscore and subject to allow for sorting at the end
+        index_tuple = (hit.strip(), bitscore, subject)
+        hitdict[query].append(index_tuple)
+        if MEM_REDUCE:  # ~50% slower, ~200x less memory usage
             hitdict[query] = sorted(hitdict[query], key=lambda x: x[1], reverse=True)[:N]
-            total_hits += 1
+        total_hits += 1
 
 # The <file> argument directs output to standard error rather than
 # standard out, to maintain clean redirection of the filtered query
