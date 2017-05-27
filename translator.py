@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 usage: translator.py [-h] [-v {short,long}] [-p {1,2}] [-r]
                      [-s STOP_CHARACTER] [--no_mask]

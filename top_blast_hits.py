@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-d] [-s] [-m] blast_file
+usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-d] [-s] [-m] [-r]
+                         blast_file
 
 Reports the top n BLAST hits for each query in a (tabular) blast output file
 
@@ -21,6 +22,8 @@ optional arguments:
   -m, --memory_efficient
                         avoid reading entire dataset into memory at once, to
                         increase memory efficiency (default: False)
+  -r, --redundant_ids   allow query and subject to share the same identifier
+                        (default: False)
 
 """
 import sys
