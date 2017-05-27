@@ -52,7 +52,12 @@ def fasta_parse(fasta, separator=None):
             seq = separator.join(str(e) for e in seq)
         yield header, seq
 
-def translate_seq(string, verbosity="single", phase=0, rev=False):
+def translate_seq(
+    string, 
+    verbosity="single", 
+    phase=0, 
+    rev=False, 
+    stop_char='*'):
     codonMap = {
         'AAA': ('K', 'Lys', 'Lysine'),
         'AAC': ('N', 'Asn', 'Asparagine'),
@@ -115,9 +120,9 @@ def translate_seq(string, verbosity="single", phase=0, rev=False):
         'TTC': ('F', 'Phe', 'Phenylalanine'),
         'TTG': ('L', 'Leu', 'Leucine'),
         'TTT': ('F', 'Phe', 'Phenylalanine'),
-        'TAA': ('*', '*', 'STOP'),
-        'TAG': ('*', '*', 'STOP'),
-        'TGA': ('*', '*', 'STOP')
+        'TAA': (stop_char, stop_char, 'STOP'),
+        'TAG': (stop_char, stop_char, 'STOP'),
+        'TGA': (stop_char, stop_char, 'STOP')
     }
 
     def get_codons(s, p=0):
@@ -155,7 +160,10 @@ def translate_seq(string, verbosity="single", phase=0, rev=False):
         try:
             amino_acids.append(codonMap[c.upper()][v])
         except KeyError:
-            amino_acids.append(c.lower())
+            if NO_MASK:
+                amino_acids.append(c.lower())
+            else:
+                amino_acids.append('X')
     return joinChar.join(amino_acids), stopString
 
 def parse_seq(s):
@@ -166,7 +174,8 @@ def parse_seq(s):
         s, 
         verbosity=v_level, 
         phase=phase_choice,
-        rev=rev_choice)
+        rev=rev_choice,
+        stop_char=STOP_CHAR)
     print(aas, flush=True)
     print(stopInfo, file=sys.stderr)
 
@@ -203,14 +212,22 @@ def parse_file(seqFile):
     if isFasta:
         for h, s in fasta_parse(seqFile, separator=""):
             aas, stopInfo = translate_seq(
-                s, verbosity=v_level, phase=phase_choice, rev=rev_choice)
+                s, 
+                verbosity=v_level, 
+                phase=phase_choice, 
+                rev=rev_choice, 
+                stop_char=STOP_CHAR)
             print(">" + h + "\t" + stopInfo)
             print(aas, flush=True)
     else:
         with open(seqFile) as f:
             for l in f:
                 aas, stopInfo = translate_seq(
-                    l, verbosity=v_level, phase=phase_choice, rev=rev_choice)
+                    l, 
+                    verbosity=v_level, 
+                    phase=phase_choice, 
+                    rev=rev_choice, 
+                    stop_char=STOP_CHAR)
                 print(aas, flush=True)
 
 parser = argparse.ArgumentParser(
@@ -243,6 +260,17 @@ parser.add_argument(
     help='reverse-complement the sequence before translation',
     action='store_true'
 )
+parser.add_argument(
+    '-s',
+    '--stop_character',
+    help='the string to use for stop codons',
+    type=str
+)
+parser.add_argument(
+    '--no_mask',
+    action='store_true',
+    help='do not mask unrecognized codons with X; report lowercased'
+)
 
 args = parser.parse_args()
 
@@ -258,6 +286,8 @@ if not seq_input:
 v_level = args.verbosity
 phase_choice = args.phase
 rev_choice = args.reverse_complement
+NO_MASK = args.no_mask
+STOP_CHAR = args.stop_character
 
 try:
     if os.path.isfile(seq_input):
