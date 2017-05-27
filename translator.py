@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 """
-usage: translator.py [-h] [-v {short,long}] [-p {1,2}] [-r] [sequence_input]
+usage: translator.py [-h] [-v {short,long}] [-p {1,2}] [-r]
+                     [-s STOP_CHARACTER] [--no_mask]
+                     [sequence_input]
 
 Translate nucleotide sequence into amino acid sequence
 
@@ -19,7 +21,10 @@ optional arguments:
   -r, --reverse_complement
                         reverse-complement the sequence before translation
                         (default: False)
-
+  -s STOP_CHARACTER, --stop_character STOP_CHARACTER
+                        the string to use for stop codons (default: None)
+  --no_mask             do not mask unrecognized codons with X; report
+                        lowercased (default: False)
 """
 import sys
 import os
