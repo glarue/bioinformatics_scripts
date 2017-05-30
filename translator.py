@@ -268,7 +268,8 @@ parser.add_argument(
     '-s',
     '--stop_character',
     help='the string to use for stop codons',
-    type=str
+    type=str,
+    default='*'
 )
 parser.add_argument(
     '--no_mask',
