@@ -102,18 +102,18 @@ class GFFLineInfo(object):
         if any(kw in og_type for kw in disqualifying):
             return None
 
-        # # Not an obvious type, so search for features of transcripts
-        # # and genes in infostring to try to infer type
-        # gene_tags = ["ID=", "gene_id", "geneId"]
-        # transcript_tags = ["ID=", "transcriptId", "transcript_ID"]
-        # # Transcripts first because genes shouldn't have transcript IDs,
-        # # but transcripts may have gene IDs
-        # for ftype, tags in zip(
-        #         ['transcript', 'gene'], [transcript_tags, gene_tags]
-        # ):
-        #     match = self.__field_match(self.infostring, tags, delimiter)
-        #     if match:
-        #         return ftype
+        # Not an obvious type, so search for features of transcripts
+        # and genes in infostring to try to infer type
+        gene_tags = ["gene_id", "geneId"]
+        transcript_tags = ["transcriptId", "transcript_ID"]
+        # Transcripts first because genes shouldn't have transcript IDs,
+        # but transcripts may have gene IDs
+        for ftype, tags in zip(
+                ['transcript', 'gene'], [transcript_tags, gene_tags]
+        ):
+            match = self.__field_match(self.infostring, tags, delimiter)
+            if match:
+                return ftype
 
     def is_protein_coding(self):
         """
@@ -445,7 +445,10 @@ def longest_isoforms(transcript_dict, use_coords=False):
         # sort by longest transcripts first
         for name, meta in sorted(transcripts.items(), 
         key=lambda x: coding_length(x[1]['children']), reverse=True):
-            gene = meta['info']['parent']
+            try:
+                gene = meta['info']['parent']
+            except:
+                print(name, meta, file=sys.stderr)
             if gene not in seen_genes:
                 if use_coords:
                     # skip those overlapping longer transcripts
