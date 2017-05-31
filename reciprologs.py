@@ -262,7 +262,7 @@ if PARALOGS:
     top_reverse = top_forward
     # reciprologs = get_reciprocals(top_forward, top_forward)
 else:
-    reverse_args = [BLAST, SUBJECT, QUERY, BLAST_TYPE, '-n', rv_fn] + optional
+    reverse_args = [BLAST, QUERY, SUBJECT, BLAST_TYPE, '-n', rv_fn] + optional
     subprocess.run(reverse_args)
     top_reverse = get_top_hits(rv_fn)
 
