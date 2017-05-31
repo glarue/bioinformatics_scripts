@@ -215,13 +215,10 @@ FLANK = args.flank
 if args.info_file:
     input_type = 'file'
     list_file = args.info_file
+    info_dict = info_from_file(list_file)
 else:
     input_type = 'direct'
     direct_args = args.sequence_information
-
-if input_type == "file":
-    info_dict = info_from_file(list_file)
-elif input_type == "direct":
     info_dict = info_from_args(direct_args)
 
 for seq, seq_info in seqs_from_fasta(FASTA, info_dict):
