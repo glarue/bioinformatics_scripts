@@ -212,12 +212,11 @@ args = parser.parse_args()
 FASTA = args.FASTA_file
 FLANK = args.flank
 
+# Parse information differently depending on source
 if args.info_file:
-    input_type = 'file'
     list_file = args.info_file
     info_dict = info_from_file(list_file)
 else:
-    input_type = 'direct'
     direct_args = args.sequence_information
     info_dict = info_from_args(direct_args)
 
