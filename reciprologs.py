@@ -2,13 +2,13 @@
 
 """
 usage: reciprologs.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]]
-                      query subject {blastn,blastp,blastx,tblastn,tblastx}
+                      file_1 file_2 {blastn,blastp,blastx,tblastn,tblastx}
 
 Uses BLAST to find reciprocal best hits between two files.
 
 positional arguments:
-  query                 query file to be BLASTed
-  subject               subject file to be BLASTed
+  file_1                file to BLAST
+  file_2                file to BLAST
   {blastn,blastp,blastx,tblastn,tblastx}
                         type of BLAST program to run
 
@@ -180,12 +180,12 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument(
-    'query',
-    help='query file to be BLASTed'
+    'file_1',
+    help='file to BLAST',
 )
 parser.add_argument(
-    'subject',
-    help='subject file to be BLASTed'
+    'file_2',
+    help='file to BLAST'
 )
 parser.add_argument(
     'blast_type',
@@ -224,8 +224,8 @@ args = parser.parse_args()
 BLAST_TYPE = args.blast_type
 THREADS = args.threads
 PARALLEL = args.parallel_processes
-SUBJECT = args.subject
-QUERY = args.query
+QUERY = args.file_1
+SUBJECT = args.file_2
 
 BLAST = 'blast.py'
 
