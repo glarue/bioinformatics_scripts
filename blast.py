@@ -383,9 +383,9 @@ QUERY = run_files['query']
 
 if not OUT_NAME:
     OUT_NAME = '{}-{}.{}.blast_results'.format(
-        BLAST_TYPE,
         abbreviate(QUERY), 
-        abbreviate(SUBJECT))
+        abbreviate(SUBJECT),
+        BLAST_TYPE)
 
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE)
 
