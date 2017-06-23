@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK]
+usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK] [--unformatted]
                          FASTA_file
                          [sequence_information [sequence_information ...]]
 
@@ -17,9 +17,11 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -f INFO_FILE, --info_file INFO_FILE
-                        File with information for sequences on separate lines.
-  --flank FLANK         Size of any desired flanking region around specified
+                        file with information for sequences on separate lines.
+  --flank FLANK         size of any desired flanking region around specified
                         sequence(s)
+  --unformatted, -u     leave original file formatting intact (e.g. don't join
+                        multi-line entries into a single line)
 
 """
 import sys
