@@ -25,7 +25,7 @@ optional arguments:
 import sys
 import argparse
 
-def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
+def fasta_parse(fasta, delimiter=">", separator="", trim_header=False):
     """
     Iterator which takes FASTA as input. Yields
     header/value pairs. Separator will be
@@ -158,7 +158,7 @@ def info_from_args(args):
 
 def seqs_from_fasta(fasta, line_dict):
     num_keys = len(line_dict.keys())
-    for h, s in fasta_parse(fasta):
+    for h, s in fasta_parse(fasta, separator=SEP_CHAR):
         try:
             seq_lines = line_dict[h]
         except KeyError:
@@ -195,13 +195,20 @@ parser.add_argument(
 parser.add_argument(
     '-f',
     '--info_file',
-    help='File with information for sequences on separate lines.'
+    help='file with information for sequences on separate lines.'
 )
 parser.add_argument(
     '--flank',
     type=int,
-    help='Size of any desired flanking region around specified sequence(s)',
+    help='size of any desired flanking region around specified sequence(s)',
     default=0
+)
+parser.add_argument(
+    '--unformatted',
+    '-u',
+    action='store_true',
+    help=("leave original file formatting intact (e.g. don't join "
+          "multi-line entries into a single line)")
 )
 
 if len(sys.argv) == 1:
@@ -211,6 +218,11 @@ args = parser.parse_args()
 
 FASTA = args.FASTA_file
 FLANK = args.flank
+
+if args.unformatted:
+    SEP_CHAR = '\n'
+else:
+    SEP_CHAR = ''
 
 # Parse information differently depending on source
 if args.info_file:
