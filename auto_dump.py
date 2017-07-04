@@ -8,7 +8,7 @@ automatically detect if reads are single- or paired-end and will run fastq-
 dump accordingly, adding proper ID suffixes as needed. Accession numbers may
 be provided directly, or in a file using the -f option. If provided directly,
 accessions may be comma or space separated, or hyphen-separated to specify a
-range, e.g. SRR123455, SRR123456, SRR123457 || SRR123455-SRR123457
+range, e.g. SRR123455, SRR123456, SRR123457 or SRR123455-SRR123457
 
 positional arguments:
   accessions            List of SRA accession numbers (e.g. SRR123456
@@ -136,7 +136,7 @@ parser = argparse.ArgumentParser(
     'suffixes as needed. Accession numbers may be provided directly, or '
     'in a file using the -f option. If provided directly, accessions may '
     'be comma or space separated, or hyphen-separated to specify a range, '
-    'e.g. SRR123455, SRR123456, SRR123457 || SRR123455-SRR123457'
+    'e.g. SRR123455, SRR123456, SRR123457 or SRR123455-SRR123457'
 )
 parser.add_argument(
     'accessions',
