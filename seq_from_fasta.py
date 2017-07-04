@@ -231,6 +231,8 @@ if args.info_file:
     list_file = args.info_file
     info_dict = info_from_file(list_file)
 else:
+    if len(args.sequence_information) < 4:
+        sys.exit('Insufficient sequence information provided. Exiting.')
     direct_args = args.sequence_information
     info_dict = info_from_args(direct_args)
 
