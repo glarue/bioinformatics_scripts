@@ -23,7 +23,9 @@ optional arguments:
   -v, --verbose_headers
                         include coordinate info in output headers (default:
                         False)
+
 """
+
 import sys
 import argparse
 from collections import defaultdict
@@ -464,6 +466,28 @@ def longest_isoforms(transcript_dict, use_coords=False):
     
     return longest_isoforms
 
+def finalize_transcripts(transcript_dict):
+    """
+    Reformats transcripts, and returns a dictionary.
+    
+    """
+    # identify longest isoforms
+    # sort by length, then use either gene name or overlap() function 
+    # to determine if subsequent transcripts are isoforms of longest 
+    # version and skip if they are
+    finalized = defaultdict(dict)
+    for region, transcripts in transcript_dict.items():
+        for name, meta in sorted(transcripts.items()):
+            try:
+                gene = meta['info']['parent']
+            except:
+                print(name, meta, file=sys.stderr)
+            length = coding_length(meta['children'])
+            meta['info']['length'] = length
+            finalized[region][name] = meta
+    
+    return finalized
+
 # def longest_isoforms_by_gene(transcript_dict):
 #     """
 #     Identifies longest isoforms, and returns a dictionary.
@@ -629,7 +653,9 @@ if not child_found:
     if not child_found:
         sys.exit('[!] No {} entries found in annotation.'.format(child_type))
 
-if not ISOFORMS:
+if ISOFORMS:  # don't filter out extra isoformsy
+    transcripts = finalize_transcripts(transcripts)
+else:
     transcripts = longest_isoforms(transcripts, FILTER_BY_COORDS)
 
 seq_count = 0
