@@ -265,7 +265,6 @@ def prep_blast(subject, query, blast_type):
 
 
 def parallel_blast(subject, query, blast_type, out_name=None):
-
     pool = Pool(PARALLEL)
     blast = partial(local_blast, subject, blast_type)
     count = 0
