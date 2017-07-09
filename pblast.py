@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: blast.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]] [-n NAME]
+usage: pblast.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]] [-n NAME]
                 query subject {blastn,blastp,blastx,tblastn,tblastx}
 
 BLAST one file against another
@@ -133,7 +133,7 @@ def local_blast(
         filename,
         out_fmt=6, 
         threads=1, 
-        e=1e-10):
+        e_value=1e-10):
     """
     Runs BLAST+ sub-program (blastp, blastn, blastx, tblastn, tblastx)
     with the given query on the given database.
@@ -154,7 +154,7 @@ def local_blast(
         "-query",
         query_file,
         "-evalue",
-        e,
+        e_value,
         "-outfmt",
         out_fmt,
         "-out",
@@ -166,7 +166,7 @@ def local_blast(
     cmd_string = ' '.join(cmd_args)
     print("[#] Starting BLAST search on '{}' vs. '{}':\n{}"
           .format(query_file, db_file, cmd_string), file=sys.stderr)
-    time.sleep(1)  # for parallel print synchronization
+    time.sleep(5)  # for parallel print synchronization
     subprocess.call(cmd_args)
     run_time = get_runtime(start_time)
     print("[#] BLAST finished in {}".format(run_time), file=sys.stderr)
@@ -264,9 +264,14 @@ def prep_blast(subject, query, blast_type):
     return subject, query
 
 
-def parallel_blast(subject, query, blast_type, out_name=None):
+def parallel_blast(
+        subject, 
+        query, 
+        blast_type, 
+        e_value=1e-10, 
+        out_name=None):
     pool = Pool(PARALLEL)
-    blast = partial(local_blast, subject, blast_type)
+    blast = partial(local_blast, subject, blast_type, e_value=e_value)
     count = 0
     for h, s in fasta_parse(query):
         count += 1
@@ -360,6 +365,13 @@ parser.add_argument(
     type=str,
     help='filename for results (otherwise, automatic)'
 )
+parser.add_argument(
+    '-e',
+    '--e_value',
+    help='e-value threshold to use for search',
+    type=float,
+    default=1e-10
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -370,6 +382,7 @@ BLAST_TYPE = args.blast_type
 THREADS = args.threads
 PARALLEL = args.parallel_processes
 OUT_NAME = args.name
+E_VALUE = args.e_value
 
 run_files = {'query': args.query, 'subject': args.subject}
 
@@ -389,7 +402,12 @@ if not OUT_NAME:
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE)
 
 if PARALLEL:
-    pblast_out = parallel_blast(SUBJECT, QUERY, BLAST_TYPE, OUT_NAME)
+    pblast_out = parallel_blast(
+        SUBJECT, 
+        QUERY, 
+        BLAST_TYPE, 
+        e_value=E_VALUE, 
+        out_name=OUT_NAME)
     concatenate(OUT_NAME, pblast_out)
 else:
     blast_out = local_blast(
@@ -397,6 +415,7 @@ else:
         BLAST_TYPE, 
         QUERY, 
         filename=OUT_NAME, 
-        threads=THREADS)
+        threads=THREADS,
+        e_value=E_VALUE)
 
 sys.exit(0)
