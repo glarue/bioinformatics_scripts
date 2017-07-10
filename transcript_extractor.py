@@ -353,6 +353,7 @@ def get_transcripts(gff, child_type):
     transcripts = defaultdict(dict)
     child_type_found = False
     regions_with_content = []
+    orphans = 0
     with open(gff) as annot:
         for ln, line in enumerate(annot):
             feat = None  ###!!! testing
@@ -364,8 +365,11 @@ def get_transcripts(gff, child_type):
                 info_dict = {
                     'name': feat.name,
                     'strand': feat.strand,
-                    'parent': feat.parent,
-                    'coords': (feat.start, feat.stop)
+                    # use transcript names as genes if no 
+                    # parent field in transcript
+                    'parent': feat.parent if feat.parent else feat.name,
+                    'coords': (feat.start, feat.stop),
+                    'region': feat.region
                 }
                 if feat.name not in transcripts[feat.region]:
                     transcripts[feat.region][feat.name] = {
@@ -377,6 +381,9 @@ def get_transcripts(gff, child_type):
                 if not child_type_found:
                     child_type_found = True
                 parent = feat.parent
+                if not parent:
+                    orphans += 1
+                    continue
                 start = feat.start
                 stop = feat.stop
                 region = feat.region
@@ -386,6 +393,7 @@ def get_transcripts(gff, child_type):
                 entry.append((start, stop))
                 if region not in regions_with_content:
                     regions_with_content.append(region)
+    print('[#] Skipped {} orphan {} features'.format(orphans, child_type), file=sys.stderr)
     transcripts = {
         k: v for k, v in transcripts.items() if k in regions_with_content}
     
@@ -403,31 +411,6 @@ def overlap_check(a, b):
     else:
         return False
 
-# def longest_isoforms_by_coord(transcript_dict):
-#     """
-#     Identifies longest isoforms, and returns a dictionary.
-    
-#     """
-#     # identify longest isoforms
-#     # sort by length, then use overlap() function to determine if
-#     # subsequent transcripts are isoforms of longest version and skip
-#     # if they are.
-#     longest_isoforms = {}
-#     for region, transcripts in transcript_dict.items():
-#         if region not in longest_isoforms:
-#             longest_isoforms[region] = {}
-#         seen_coords = set()
-#         # sort by longest transcripts first
-#         for name, meta in sorted(transcripts.items(), 
-#         key=lambda x: coding_length(x[1]['children']), reverse=True):
-#             coords = meta['info']['coords']
-#             if not any(overlap_check(coords, c) for c in seen_coords):
-#                 length = coding_length(meta['children'])
-#                 meta['info']['length'] = length
-#                 longest_isoforms[region][name] = meta
-#             seen_coords.add(coords)
-            
-#     return longest_isoforms
 
 def longest_isoforms(transcript_dict, use_coords=False):
     """
@@ -488,65 +471,6 @@ def finalize_transcripts(transcript_dict):
     
     return finalized
 
-# def longest_isoforms_by_gene(transcript_dict):
-#     """
-#     Identifies longest isoforms, and returns a dictionary.
-    
-#     """
-#     # identify longest isoforms
-#     # sort by length, then use overlap() function to determine if
-#     # subsequent transcripts are isoforms of longest version and skip
-#     # if they are.
-#     longest_isoforms = {}
-#     seen_genes = set()
-#     for region, transcripts in transcript_dict.items():
-#         if region not in longest_isoforms:
-#             longest_isoforms[region] = {}
-#         # sort by longest transcripts first
-#         for name, meta in sorted(transcripts.items(), 
-#         key=lambda x: coding_length(x[1]['children']), reverse=True):
-#             gene = meta['info']['parent']
-#             if gene not in seen_genes:
-#                 seen_genes.add(gene)
-#                 length = coding_length(meta['children'])
-#                 meta['info']['length'] = length
-#                 longest_isoforms[region][name] = meta
-    
-#     return longest_isoforms
-
-
-## old way, works
-# def longest_isoforms_by_gene(transcript_dict):
-#     """
-#     Identifies longest isoforms, and returns a dictionary.
-    
-#     """
-#     # identify longest isoforms
-#     longest_isoforms = {}
-#     for region, transcripts in transcript_dict.items():
-#         for name, meta in transcripts.items():
-#             gene = meta['info']['parent']
-#             length = coding_length(meta['children'])
-#             if gene in longest_isoforms:
-#                 if length <= longest_isoforms[gene]['length']:
-#                     continue
-#             longest_isoforms[gene] = {
-#                 'transcript': name,
-#                 'length': length}
-
-#     # filter based on longest found transcripts
-#     filtered = {}
-#     for region, transcripts in transcript_dict.items():
-#         if region not in filtered:
-#             filtered[region] = {}
-#         for name, meta in transcripts.items():
-#             gene = meta['info']['parent']
-#             if name != longest_isoforms[gene]['transcript']:
-#                 continue
-#             else:
-#                 filtered[region][name] = meta
-
-#     return filtered
 
 def coding_length(coords):
     return sum([abs(stop-start) for start, stop in coords])
@@ -558,10 +482,12 @@ def get_coding_seq(seq, coord_list):
     
     return full_seq
 
+
 def format_output(region_seq, t_dict, verbose=False):
     t_info = t_dict['info']
     t_name = t_info['name']
     strand = t_info['strand']
+    region = t_info['region']
     span = ':'.join(map(str, t_info['coords']))
     length = str(t_info['length'])
     seq_coords = t_dict['children']
@@ -571,7 +497,7 @@ def format_output(region_seq, t_dict, verbose=False):
     if TRANSLATE is True:
         seq = translate_seq(seq)
     gene = t_info['parent']
-    header_bits = [t_name, gene, strand, span, length]
+    header_bits = [t_name, gene, region, strand, span, length]
     if verbose is True:
         coord_string = ','.join(['-'.join(list(map(str, c))) for c in seq_coords])
         header_bits.append(coord_string)
