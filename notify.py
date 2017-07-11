@@ -1,11 +1,31 @@
 #!/usr/bin/env python3
 
 """
-A wrapper for any script which will send notice to the
-specified email address when the script completes.
+usage: notify.py [-h] [-e EMAIL] [--add_email] [--view_config] [--ID ID]
+                 [external commands [external commands ...]]
 
+Automatically sends an email to the specified address upon completion of the
+specified command. Useful primarily for very long-running processes. In many
+cases, the command being run (including the name of the other program) will
+need to be placed in quotes. If no email address is provided with the -e flag,
+a prompt will be displayed based upon the configuration file.
 
+positional arguments:
+  external commands     External commands to run, including external program
+                        call (default: None)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -e EMAIL, --email EMAIL
+                        the email address to notify (default: None)
+  --add_email           add or change an email address in the config file
+                        (default: False)
+  --view_config         view the contents of the configuration file (default:
+                        False)
+  --ID ID               additional string to include in email subject
+                        (default: None)
 """
+
 import sys
 import subprocess
 import time
@@ -253,7 +273,11 @@ def send_ssl_mail(
     if body:
         msg.attach(MIMEText(body, 'plain'))
     # server = smtplib.SMTP_SSL(server_address, port)  # stopped working w/ namecheap
-    server = smtplib.SMTP(server_address, port)
+    try:
+        server = smtplib.SMTP(server_address, port)
+    except smtplib.SMTPConnectError:
+        time.sleep(10)
+        server = smtplib.SMTP(server_address, port)
     retries = 2
     success = False
     while retries > 0:  # in case server rejects attempt
