@@ -160,7 +160,7 @@ def info_from_args(args):
 
 def seqs_from_fasta(fasta, line_dict):
     num_keys = len(line_dict.keys())
-    for h, s in fasta_parse(fasta, separator=SEP_CHAR):
+    for h, s in fasta_parse(fasta, separator=SEP_CHAR, trim_header=TRIM):
         try:
             seq_lines = line_dict[h]
         except KeyError:
@@ -212,6 +212,11 @@ parser.add_argument(
     help=("leave original file formatting intact (e.g. don't join "
           "multi-line entries into a single line)")
 )
+parser.add_argument(
+    '--full_header',
+    action='store_true',
+    help="match on full header string (including spaces)"
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -220,6 +225,10 @@ args = parser.parse_args()
 
 FASTA = args.FASTA_file
 FLANK = args.flank
+if args.full_header:
+    TRIM = False
+else:
+    TRIM = True
 
 if args.unformatted:
     SEP_CHAR = '\n'
@@ -231,7 +240,7 @@ if args.info_file:
     list_file = args.info_file
     info_dict = info_from_file(list_file)
 else:
-    if len(args.sequence_information) < 4:
+    if 2 < len(args.sequence_information) < 4:
         sys.exit('Insufficient sequence information provided. Exiting.')
     direct_args = args.sequence_information
     info_dict = info_from_args(direct_args)
