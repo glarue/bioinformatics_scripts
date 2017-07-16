@@ -422,4 +422,6 @@ send_args = {
 
 send_ssl_mail(**send_args)
 
+print('[#] Command completed in {}'.format(run_time), file=sys.stderr)
+
 sys.exit(0)
