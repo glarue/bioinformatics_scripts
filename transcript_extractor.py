@@ -389,8 +389,7 @@ def get_transcripts(gff, child_type):
                 region = feat.region
                 if parent not in transcripts[region]:
                     transcripts[region][parent] = {'children': []}
-                entry = transcripts[region][parent]['children']
-                entry.append((start, stop))
+                transcripts[region][parent]['children'].append((start, stop))
                 if region not in regions_with_content:
                     regions_with_content.append(region)
     print('[#] Skipped {} orphan {} features'.format(orphans, child_type), file=sys.stderr)
