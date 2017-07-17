@@ -98,7 +98,7 @@ class GFFLineInfo(object):
         if og_type == 'mrna':
             og_type = 'transcript'
         if og_type in ('gene', 'transcript', 'exon', 'cds'):
-            return og_type
+            return og_type.lower()
 
         disqualifying = ['utr', 'start', 'stop']
         if any(kw in og_type for kw in disqualifying):
@@ -356,7 +356,7 @@ def get_transcripts(gff, child_type):
     orphans = 0
     with open(gff) as annot:
         for ln, line in enumerate(annot):
-            feat = None  ###!!! testing
+            feat = None
             try:
                 feat = GFFLineInfo(line, ln)
             except TypeError:
@@ -448,6 +448,7 @@ def longest_isoforms(transcript_dict, use_coords=False):
     
     return longest_isoforms
 
+
 def finalize_transcripts(transcript_dict):
     """
     Reformats transcripts, and returns a dictionary.
@@ -473,6 +474,7 @@ def finalize_transcripts(transcript_dict):
 
 def coding_length(coords):
     return sum([abs(stop-start) for start, stop in coords])
+
 
 def get_coding_seq(seq, coord_list):
     full_seq = ''
@@ -503,6 +505,7 @@ def format_output(region_seq, t_dict, verbose=False):
     header = '\t'.join(header_bits)
 
     return '>{}\n{}'.format(header, seq)
+
 
 parser = argparse.ArgumentParser(
     description='Extract transcript/coding sequences from '
@@ -578,7 +581,7 @@ if not child_found:
     if not child_found:
         sys.exit('[!] No {} entries found in annotation.'.format(child_type))
 
-if ISOFORMS:  # don't filter out extra isoformsy
+if ISOFORMS:  # don't filter out extra isoforms
     transcripts = finalize_transcripts(transcripts)
 else:
     transcripts = longest_isoforms(transcripts, FILTER_BY_COORDS)
@@ -589,16 +592,16 @@ total_regions = len(transcripts)
 for region, region_seq in fasta_parse(GENOME):
     if total_regions == 0:  # don't keep looping if we're done
         break
-    try:
-        for t_name, t_dict in sorted(transcripts[region].items()):
+    if region not in transcripts:
+        continue
+    else:
+        region_dict = transcripts[region]
+        for t_name, t_dict in sorted(region_dict.items()):
             if not t_dict['children']:
                 continue
             print(format_output(region_seq, t_dict, verbose=VERBOSE), flush=True)
             seq_count += 1
         total_regions -= 1
-    except KeyError:
-        continue
-    
 
 print('[#] Extracted {} coding sequences'.format(seq_count), file=sys.stderr)
 
