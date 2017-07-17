@@ -22,7 +22,7 @@ optional arguments:
                         without specific input will use half available system
                         CPUs (default: None)
 
-Depends on blast.py
+NOTE: Depends on pblast.py
 
 """
 import sys
@@ -227,7 +227,7 @@ PARALLEL = args.parallel_processes
 QUERY = args.file_1
 SUBJECT = args.file_2
 
-BLAST = 'blast.py'
+BLAST = 'pblast.py'
 
 # special case of BLASTing against self
 if QUERY == SUBJECT:
