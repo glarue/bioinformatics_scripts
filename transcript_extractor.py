@@ -45,8 +45,11 @@ class GFFLineInfo(object):
             self.start = min(map(int, self.bits[3:5]))
             self.stop = max(map(int, self.bits[3:5]))
             self.strand = self.bits[6]
+            if self.strand not in ('+', '-'):
+                self.strand = '+'
             self.infostring = self.bits[8]
-            self.feat_type = self.get_type()
+            # self.feat_type = self.get_type()
+            self.feat_type = self.bits[2].lower()
             self.parent = self.get_parent()
             self.name = self.get_ID()
             self.line_number = line_number
@@ -73,7 +76,13 @@ class GFFLineInfo(object):
         return columns
 
     @staticmethod
-    def __field_match(infostring, tags, delimiter):
+    def __field_match(infostring, tags, delimiter, tag_order=False):
+        if tag_order:
+            # check for first match of tags in order 
+            try:
+                tags = [next(t for t in tags if t.lower() in infostring)]
+            except StopIteration:
+                return None
         info_bits = infostring.split(delimiter)
         try:
             match = next(
@@ -87,6 +96,7 @@ class GFFLineInfo(object):
             substring = match.split()[1]
         return substring.strip("\"")
 
+
     def get_type(self, delimiter=';'):
         """
         Classifies annotation lines into type categories,
@@ -98,14 +108,26 @@ class GFFLineInfo(object):
         if og_type == 'mrna':
             og_type = 'transcript'
         if og_type in ('gene', 'transcript', 'exon', 'cds'):
-            return og_type.lower()
+            return og_type
 
         disqualifying = ['utr', 'start', 'stop']
         if any(kw in og_type for kw in disqualifying):
-            return None
+            return og_type
 
         # Not an obvious type, so search for features of transcripts
         # and genes in infostring to try to infer type
+
+        # check for explicit mention of transcript in ID
+        try:
+            id_string = next(
+                (f for f in delimiter.split(self.infostring) 
+                if f.startswith("ID")))
+
+            if any(tag in id_string for tag in ('transcript', 'mrna')):
+                return 'transcript'
+        except StopIteration:
+            pass
+
         gene_tags = ["gene_id", "geneId"]
         transcript_tags = ["transcriptId", "transcript_ID"]
         # Transcripts first because genes shouldn't have transcript IDs,
@@ -116,6 +138,9 @@ class GFFLineInfo(object):
             match = self.__field_match(self.infostring, tags, delimiter)
             if match:
                 return ftype
+            else:
+                return og_type
+
 
     def is_protein_coding(self):
         """
@@ -135,33 +160,46 @@ class GFFLineInfo(object):
         else:
             return False
 
+
     def get_ID(self, delimiter=";"):
         """
         Finds the ID of a given annotation file line.
 
         """
+        # first, do it the easy way
+        infostring = self.infostring        
+        match = self.__field_match(infostring, ["ID="], delimiter)
+        if match:
+            return match
+
         # Constrain feature types to simplify indexing
-        feat_type_converter = {"cds": "exon", "mrna": "transcript"}
         feat_type = self.feat_type
-        if feat_type in feat_type_converter:
-            feat_type = feat_type_converter[feat_type]
+        if feat_type == "mrna":
+            feat_type = "transcript"
         # all get lowercased in the comparison
-        child_tags = ["ID="]
         # if is no 'ID=', should reference self via others
         gene_tags = ["ID=", "gene_id", "geneId"]
         transcript_tags = ["ID=", "transcriptId", "transcript_ID"]
         tag_selector = {
             "gene": gene_tags,
-            "transcript": transcript_tags,
-            "exon": child_tags
+            "transcript": transcript_tags
         }
         try:
             tags = tag_selector[feat_type]
         except KeyError:
-            return None
-        infostring = self.infostring
-        match = self.__field_match(infostring, tags, delimiter)
+            # get any ID available
+            tags = ['transcriptID', 'transcript_ID', 'gene_ID', 'geneID']
+
+        match = self.__field_match(
+            infostring, tags, delimiter, tag_order=True)
+
+        # if nothing matches, return infostring if there's only
+        # one tag in it (common for gtf parent features)
+        if match is None and infostring.count(";") < 2:
+            match = infostring.split(";")[0]
+
         return match
+
 
     def get_parent(self, delimiter=";"):
         """
@@ -186,11 +224,12 @@ class GFFLineInfo(object):
         try:
             tags = tag_selector[feat_type]
         except KeyError:
-            return None
+            tags = list(set(child_tags + transcript_tags))
         infostring = self.infostring
         match = self.__field_match(infostring, tags, delimiter)
         if not match and feat_type == "transcript":
             match = self.get_ID()
+
         return match
 
 
@@ -349,8 +388,10 @@ def translate_seq(string, verbosity="single", phase=0):
             amino_acids.append(c.lower())
     return joinChar.join(amino_acids)
 
+
 def get_transcripts(gff, child_type):
     transcripts = defaultdict(dict)
+    feature_info = {}
     child_type_found = False
     regions_with_content = []
     orphans = 0
@@ -361,7 +402,7 @@ def get_transcripts(gff, child_type):
                 feat = GFFLineInfo(line, ln)
             except TypeError:
                 continue
-            if feat.feat_type == 'transcript':
+            if feat.feat_type != child_type:
                 info_dict = {
                     'name': feat.name,
                     'strand': feat.strand,
@@ -369,14 +410,17 @@ def get_transcripts(gff, child_type):
                     # parent field in transcript
                     'parent': feat.parent if feat.parent else feat.name,
                     'coords': (feat.start, feat.stop),
-                    'region': feat.region
+                    'region': feat.region,
+                    'inferred': False
                 }
-                if feat.name not in transcripts[feat.region]:
-                    transcripts[feat.region][feat.name] = {
-                        'info': info_dict,
-                        'children': []}
-                else:  # made by child
-                    transcripts[feat.region][feat.name]['info'] = info_dict
+                if feat.name not in feature_info:
+                    feature_info[feat.name] = info_dict
+                # if feat.name not in transcripts[feat.region]:
+                #     transcripts[feat.region][feat.name] = {
+                #         'info': info_dict,
+                #         'children': []}
+                # else:  # made by child
+                #     transcripts[feat.region][feat.name]['info'] = info_dict
             elif feat.feat_type == child_type:
                 if not child_type_found:
                     child_type_found = True
@@ -388,15 +432,44 @@ def get_transcripts(gff, child_type):
                 stop = feat.stop
                 region = feat.region
                 if parent not in transcripts[region]:
-                    transcripts[region][parent] = {'children': []}
-                transcripts[region][parent]['children'].append((start, stop))
+                    try:
+                        parent_info = feature_info[parent]
+                    except KeyError:
+                        parent_info = {
+                            'strand': feat.strand,
+                            'region': region,
+                            'name': parent,
+                            'inferred': True,
+                            'parent': None,
+                            'coords': None
+                        }
+                    transcripts[region][parent] = {
+                        'info': parent_info,
+                        'children': []}
+                tr = transcripts[region][parent]
+                tr['children'].append((start, stop))
+                
                 if region not in regions_with_content:
                     regions_with_content.append(region)
-    print('[#] Skipped {} orphan {} features'.format(orphans, child_type), file=sys.stderr)
-    transcripts = {
-        k: v for k, v in transcripts.items() if k in regions_with_content}
+    print('[#] Skipped {} orphan {} features'.format(
+        orphans, child_type), file=sys.stderr)
+
+    final_transcripts = defaultdict(dict)
+    for region, trs in transcripts.items():
+        if region not in regions_with_content:
+            continue
+        for name, tr in trs.items():
+            if tr['info']['inferred']:
+                min_coord = min([e[0] for e in tr['children']])
+                max_coord = max([e[1] for e in tr['children']])
+                tr['info']['coords'] = (min_coord, max_coord)
+            final_transcripts[name] = tr
+
+    # transcripts = {
+    #     k: v for k, v in transcripts.items() if k in regions_with_content}
     
     return transcripts, child_type_found
+
 
 def overlap_check(a, b):
     """
@@ -429,10 +502,7 @@ def longest_isoforms(transcript_dict, use_coords=False):
         # sort by longest transcripts first
         for name, meta in sorted(transcripts.items(), 
         key=lambda x: coding_length(x[1]['children']), reverse=True):
-            try:
-                gene = meta['info']['parent']
-            except:
-                print(name, meta, file=sys.stderr)
+            gene = meta['info']['parent']
             if gene not in seen_genes:
                 if use_coords:
                     # skip those overlapping longer transcripts
@@ -441,7 +511,8 @@ def longest_isoforms(transcript_dict, use_coords=False):
                     if any(overlap_check(coords, c) for c in seen_coords):
                         seen_coords.add(coords)
                         continue
-                seen_genes.add(gene)
+                if gene is not None:
+                    seen_genes.add(gene)
                 length = coding_length(meta['children'])
                 meta['info']['length'] = length
                 longest_isoforms[region][name] = meta
@@ -461,10 +532,10 @@ def finalize_transcripts(transcript_dict):
     finalized = defaultdict(dict)
     for region, transcripts in transcript_dict.items():
         for name, meta in sorted(transcripts.items()):
-            try:
-                gene = meta['info']['parent']
-            except:
-                print(name, meta, file=sys.stderr)
+            # try:
+            #     gene = meta['info']['parent']
+            # except:
+            #     print(name, meta, file=sys.stderr)
             length = coding_length(meta['children'])
             meta['info']['length'] = length
             finalized[region][name] = meta
@@ -498,6 +569,8 @@ def format_output(region_seq, t_dict, verbose=False):
     if TRANSLATE is True:
         seq = translate_seq(seq)
     gene = t_info['parent']
+    if gene is None: 
+        gene = 'unknown'
     header_bits = [t_name, gene, region, strand, span, length]
     if verbose is True:
         coord_string = ','.join(['-'.join(list(map(str, c))) for c in seq_coords])
@@ -590,8 +663,6 @@ seq_count = 0
 total_regions = len(transcripts)
 
 for region, region_seq in fasta_parse(GENOME):
-    if total_regions == 0:  # don't keep looping if we're done
-        break
     if region not in transcripts:
         continue
     else:
@@ -602,6 +673,8 @@ for region, region_seq in fasta_parse(GENOME):
             print(format_output(region_seq, t_dict, verbose=VERBOSE), flush=True)
             seq_count += 1
         total_regions -= 1
+    if total_regions == 0:  # don't keep looping if we're done
+        break
 
 print('[#] Extracted {} coding sequences'.format(seq_count), file=sys.stderr)
 
