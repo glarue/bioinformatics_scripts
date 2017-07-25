@@ -166,7 +166,6 @@ def local_blast(
     cmd_string = ' '.join(cmd_args)
     print("[#] Starting BLAST search on '{}' vs. '{}':\n{}"
           .format(query_file, db_file, cmd_string), file=sys.stderr)
-    time.sleep(5)  # for parallel print synchronization
     subprocess.call(cmd_args)
     run_time = get_runtime(start_time)
     print("[#] BLAST finished in {}".format(run_time), file=sys.stderr)
