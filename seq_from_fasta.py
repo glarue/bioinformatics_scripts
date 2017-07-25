@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK] [--unformatted]
+usage: seq_from_fasta.py [-h] [-i INFO_FILE] [--flank FLANK] [--unformatted]
+                         [--full_header]
                          FASTA_file
                          [sequence_information [sequence_information ...]]
 
@@ -16,12 +17,13 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f INFO_FILE, --info_file INFO_FILE
+  -i INFO_FILE, --info_file INFO_FILE
                         file with information for sequences on separate lines.
   --flank FLANK         size of any desired flanking region around specified
                         sequence(s)
   --unformatted, -u     leave original file formatting intact (e.g. don't join
                         multi-line entries into a single line)
+  --full_header         match on full header string (including whitespace)
 
 """
 import sys
@@ -195,7 +197,7 @@ parser.add_argument(
     help='header strand start stop [label]'
 )
 parser.add_argument(
-    '-f',
+    '-i',
     '--info_file',
     help='file with information for sequences on separate lines.'
 )
@@ -215,7 +217,7 @@ parser.add_argument(
 parser.add_argument(
     '--full_header',
     action='store_true',
-    help="match on full header string (including spaces)"
+    help="match on full header string (including whitespace)"
 )
 
 if len(sys.argv) == 1:
