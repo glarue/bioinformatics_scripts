@@ -36,6 +36,7 @@ def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
 
+
 def fastq_parse(fastq):
     FqRec = namedtuple("FqRec", ["id", "seq", "meta", "quality", "full_record", "cleaned"])
     for group in grouper(fastq, 4):  # blocks of 4 lines
@@ -50,6 +51,7 @@ def fastq_parse(fastq):
         cleaned = "\n".join([fq_id, fq_seq, fq_meta, fq_quality])
         record_info = FqRec(fq_id, fq_seq, fq_meta, fq_quality, full_record, cleaned)
         yield record_info
+
 
 def paired_check(acc):
     """
@@ -102,12 +104,14 @@ def fetch_sra(acc):
 
     return sra_filename
 
+
 def acc_list_from_file(acc_file):
     accs = []
     with open(acc_file) as f:
         for l in f:
             accs.append(l.strip())
     return accs
+
 
 def clean_args(arguments):
     stage_1 = []
@@ -128,6 +132,7 @@ def clean_args(arguments):
         final_args += acc_range
 
     return final_args
+
 
 parser = argparse.ArgumentParser(
     description='A program to run fastq-dump sequentially on a list of '
