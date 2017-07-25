@@ -30,6 +30,7 @@ import sys
 import argparse
 from collections import defaultdict
 from operator import itemgetter
+import time
 
 
 class GFFLineInfo(object):
@@ -393,7 +394,7 @@ def get_transcripts(gff, child_type):
     transcripts = defaultdict(dict)
     feature_info = {}
     child_type_found = False
-    regions_with_content = []
+    regions_with_content = set()
     orphans = 0
     with open(gff) as annot:
         for ln, line in enumerate(annot):
@@ -448,9 +449,8 @@ def get_transcripts(gff, child_type):
                         'children': []}
                 tr = transcripts[region][parent]
                 tr['children'].append((start, stop))
-                
-                if region not in regions_with_content:
-                    regions_with_content.append(region)
+                regions_with_content.add(region)
+
     print('[#] Skipped {} orphan {} features'.format(
         orphans, child_type), file=sys.stderr)
 
@@ -459,7 +459,7 @@ def get_transcripts(gff, child_type):
         if region not in regions_with_content:
             continue
         for name, tr in trs.items():
-            if tr['info']['inferred']:
+            if tr['info']['inferred']:  # need to infer coords from children
                 min_coord = min([e[0] for e in tr['children']])
                 max_coord = max([e[1] for e in tr['children']])
                 tr['info']['coords'] = (min_coord, max_coord)
@@ -579,6 +579,28 @@ def format_output(region_seq, t_dict, verbose=False):
 
     return '>{}\n{}'.format(header, seq)
 
+def get_runtime(start_time, p=3):
+    """
+    Takes a start time and optional decimal precision p,
+    returns a string of the total run-time until current
+    time with appropriate units.
+
+    """
+    total = time.time() - start_time  # start with seconds
+    divided = total/60.0
+    if divided < 2:
+        run_time = total
+        units = "seconds"
+    elif divided < 60:
+        run_time = divided
+        units = "minutes"
+    else:
+        run_time = divided/60.0
+        units = "hours"
+    rounded = round(run_time, p)
+
+    return "{} {}".format(rounded, units)
+
 
 parser = argparse.ArgumentParser(
     description='Extract transcript/coding sequences from '
@@ -624,6 +646,8 @@ parser.add_argument(
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
+start = time.time()
+
 args = parser.parse_args()
 
 ANNOTATION = args.annotation
@@ -665,17 +689,18 @@ total_regions = len(transcripts)
 for region, region_seq in fasta_parse(GENOME):
     if region not in transcripts:
         continue
-    else:
-        region_dict = transcripts[region]
-        for t_name, t_dict in sorted(region_dict.items()):
-            if not t_dict['children']:
-                continue
-            print(format_output(region_seq, t_dict, verbose=VERBOSE), flush=True)
-            seq_count += 1
-        total_regions -= 1
+    region_dict = transcripts[region]
+    for t_name, t_dict in sorted(region_dict.items()):
+        if not t_dict['children']:
+            continue
+        print(format_output(region_seq, t_dict, verbose=VERBOSE), flush=True)
+        seq_count += 1
+    total_regions -= 1
     if total_regions == 0:  # don't keep looping if we're done
         break
 
-print('[#] Extracted {} coding sequences'.format(seq_count), file=sys.stderr)
+runtime = get_runtime(start)
+
+print('[#] Extracted {} coding sequences in {}'.format(seq_count, runtime), file=sys.stderr)
 
 sys.exit(0)
