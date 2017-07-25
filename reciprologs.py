@@ -254,7 +254,7 @@ for k, v in call_options.items():
     if v:
         optional.extend([str(k), str(v)])
 
-forward_args = [BLAST, SUBJECT, QUERY, BLAST_TYPE, '-n', fw_fn] + optional
+forward_args = [BLAST, QUERY, SUBJECT, BLAST_TYPE, '-n', fw_fn] + optional
 subprocess.run(forward_args)
 top_forward = get_top_hits(fw_fn, PARALOGS)
 if PARALOGS:
@@ -262,7 +262,7 @@ if PARALOGS:
     top_reverse = top_forward
     # reciprologs = get_reciprocals(top_forward, top_forward)
 else:
-    reverse_args = [BLAST, QUERY, SUBJECT, BLAST_TYPE, '-n', rv_fn] + optional
+    reverse_args = [BLAST, SUBJECT, QUERY, BLAST_TYPE, '-n', rv_fn] + optional
     subprocess.run(reverse_args)
     top_reverse = get_top_hits(rv_fn)
 
