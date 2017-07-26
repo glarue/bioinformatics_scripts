@@ -277,8 +277,9 @@ with open(out_file, 'w') as out:
 
 runtime = get_runtime(t_start)
 
-print('[#] Job finished in {}; {} pairs found. '
-      'Results are in \'{}\''.format(runtime, len(reciprologs), out_file),
+print(
+    '[#] Job finished in {}; {} pairs found: '
+    '\'{}\''.format(runtime, len(reciprologs), out_file),
       file=sys.stderr)
 
 sys.exit(0)
