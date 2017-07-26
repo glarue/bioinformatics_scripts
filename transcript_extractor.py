@@ -450,9 +450,10 @@ def get_transcripts(gff, child_type):
                 tr = transcripts[region][parent]
                 tr['children'].append((start, stop))
                 regions_with_content.add(region)
-
-    print('[#] Skipped {} orphan {} features'.format(
-        orphans, child_type), file=sys.stderr)
+    
+    if orphans:
+        print('[#] Skipped {} orphan {} features'.format(
+              orphans, child_type), file=sys.stderr)
 
     final_transcripts = defaultdict(dict)
     for region, trs in transcripts.items():
