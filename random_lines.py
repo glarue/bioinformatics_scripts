@@ -18,6 +18,7 @@ import sys
 import argparse
 import random
 from collections import deque
+import mmap
 
 def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
     """
@@ -72,21 +73,25 @@ def check_fasta(f):
                 return False
 
 
-def count_lines(f):
-    line_count = 0
-    fasta_count = 0
+# this version is slightly faster (memory-mapped file object optimized
+# for line reading)
+def count_lines(filename):
     fa = False
-    if check_fasta(f):
+    if check_fasta(filename):
         fa = True
-    with open(f) as infile:
-        for l in infile:
-            line_count += 1
-            if l.startswith(">"):
-                fasta_count += 1
-    if fa:
-        return fasta_count
-    else:
-        return line_count
+    with open(filename) as f:
+        buf = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
+        line_count = 0
+        while True:
+            line = buf.readline().decode()
+            if not line:
+                break
+            if fa:
+                if line.startswith('>'):
+                    line_count += 1
+            else:
+                line_count += 1
+    return line_count
 
 
 def line_iterator(f):
