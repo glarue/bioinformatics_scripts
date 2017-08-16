@@ -374,7 +374,7 @@ def translate_seq(string, verbosity="single", phase=0):
             yield s[i + p:i + p + 3]
 
     verbosityD = {"single": 0, "short": 1, "long": 2}
-    string = string.replace(" ", "")  # remove spaces if present
+    string = string.replace(" ", "").upper()  # remove spaces if present
     codons = _get_codons(string, p=phase)
     amino_acids = []
     v = verbosityD[verbosity]
