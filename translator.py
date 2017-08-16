@@ -132,7 +132,7 @@ def translate_seq(
     def get_codons(s, p=0):
         codons = [s[i + p:i + p + 3] for i in range(0, len(s), 3)]
         return [c for c in codons if len(c) == 3]
-    string = string.strip().replace(" ", "")  # remove spaces if present
+    string = string.strip().replace(" ", "").upper()  # remove spaces if present
     if rev is True:
         string = reverse_complement(string)
     codons = get_codons(string, p=phase)
@@ -143,6 +143,7 @@ def translate_seq(
     stopFraction = round((float(numStops)/len(codons) * 100), 2)
     firstStopPercent = None
     if numStops > 0:
+        firstStop = 0
         for i, e in enumerate(codons, start=1):
             if e in stop_codons:
                 firstStop = i
