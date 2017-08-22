@@ -139,21 +139,6 @@ def translate_seq(
     if not codons:
         return '?', '?'
     stop_codons = ("TAA", "TAG", "TGA")
-    numStops = len([e for e in codons if e.upper() in stop_codons])
-    stopFraction = round((float(numStops)/len(codons) * 100), 2)
-    firstStopPercent = None
-    if numStops > 0:
-        firstStop = 0
-        for i, e in enumerate(codons, start=1):
-            if e in stop_codons:
-                firstStop = i
-                break
-        firstStopPercent = round((float(firstStop)/len(codons) * 100), 2)
-    if firstStopPercent:
-        firstStopString = ";first_stop@{}%".format(firstStopPercent)
-    else:
-        firstStopString = ""
-    stopString = "n_stops={}({}%){}".format(numStops, stopFraction, firstStopString)
     verbosityD = {"single": 0, "short": 1, "long": 2}
     amino_acids = []
     v = verbosityD[verbosity]
@@ -169,20 +154,19 @@ def translate_seq(
                 amino_acids.append(c.lower())
             else:
                 amino_acids.append('X')
-    return joinChar.join(amino_acids), stopString
+    return joinChar.join(amino_acids)
 
 def parse_seq(s):
     if s.startswith(">"):
         print(s.strip())
         return
-    aas, stopInfo = translate_seq(
+    aas = translate_seq(
         s, 
         verbosity=v_level, 
         phase=phase_choice,
         rev=rev_choice,
         stop_char=STOP_CHAR)
     print(aas, flush=True)
-    print(stopInfo, file=sys.stderr)
 
 def reverse_complement(seq):
     """
@@ -216,18 +200,18 @@ def parse_file(seqFile):
 
     if isFasta:
         for h, s in fasta_parse(seqFile, separator=""):
-            aas, stopInfo = translate_seq(
+            aas = translate_seq(
                 s, 
                 verbosity=v_level, 
                 phase=phase_choice, 
                 rev=rev_choice, 
                 stop_char=STOP_CHAR)
-            print(">" + h + "\t" + stopInfo)
+            print(">" + h + "\t")
             print(aas, flush=True)
     else:
         with open(seqFile) as f:
             for l in f:
-                aas, stopInfo = translate_seq(
+                aas = translate_seq(
                     l, 
                     verbosity=v_level, 
                     phase=phase_choice, 
