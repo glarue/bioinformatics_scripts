@@ -302,7 +302,15 @@ def parallel_blast(
         '{}.{}.tmp'.format(out_name, i) 
         for i in range(1, len(chunked) + 1)
         ]
-    results = pool.starmap(blast, zip(chunked, filenames))
+    # use apply_async instead of starmap to allow messages
+    # to print to screen without clobbering each other
+    results = []
+    for pair in zip(chunked, filenames):
+        results.append(pool.apply_async(blast, args=pair))
+        time.sleep(.05)
+    pool.close()
+    pool.join()
+    results = [r.get() for r in results]
 
     # clean up chunk files
     [os.remove(f) for f in chunked]
