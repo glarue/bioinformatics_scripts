@@ -545,7 +545,7 @@ def finalize_transcripts(transcript_dict):
 
 
 def coding_length(coords):
-    return sum([abs(stop-start) for start, stop in coords])
+    return sum([abs(stop-start) + 1 for start, stop in coords])
 
 
 def get_coding_seq(seq, coord_list):
