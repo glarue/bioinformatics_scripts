@@ -38,7 +38,17 @@ def grouper(iterable, n, fillvalue=None):
 
 
 def fastq_parse(fastq):
-    FqRec = namedtuple("FqRec", ["id", "seq", "meta", "quality", "full_record", "cleaned"])
+    FqRec = namedtuple(
+        "FqRec", 
+        [
+            "id", 
+            "seq", 
+            "meta", 
+            "quality", 
+            "full_record", 
+            "cleaned"
+        ]
+    )
     for group in grouper(fastq, 4):  # blocks of 4 lines
         if None in group:
             continue
@@ -94,7 +104,8 @@ def fetch_sra(acc):
     base_path = 'ftp://ftp-trace.ncbi.nlm.nih.gov'
 
     # pattern of path:
-    #  /sra/sra-instant/reads/ByRun/sra/{SRR|ERR|DRR}/<first 6 characters of accession>/<accession>/<accession>.sra
+    #  /sra/sra-instant/reads/ByRun/sra/{SRR|ERR|DRR}/
+    # <first 6 characters of accession>/<accession>/<accession>.sra
     path_bits = [alpha, first_six, acc, sra_filename]
     relative_path = '/'.join(path_bits)
     sra_path = '/sra/sra-instant/reads/ByRun/sra/{}'.format(relative_path)
@@ -172,13 +183,16 @@ else:
 
 
 if len(accs) > 25:
-    choice = input('Are you sure you want to run this on {} files? (y/n): '.format(len(accs)))
+    choice = input(
+        'Are you sure you want to run this on {} files? (y/n): '
+        .format(len(accs)))
     if choice.lower() != 'y':
         sys.exit('Aborting run.')
 
 
 cmds = {
-    'paired': 'fastq-dump --defline-seq \'@$ac.$si:$sn[_$rn]/$ri\' --split-files ',
+    'paired': ('fastq-dump --defline-seq '
+    '\'@$ac.$si:$sn[_$rn]/$ri\' --split-files '),
     'single': 'fastq-dump '
 }
 
