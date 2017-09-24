@@ -448,8 +448,8 @@ THREADS = args.threads
 PARALLEL = args.parallel_processes
 OUT_NAME = args.name
 E_VALUE = args.e_value
-OUT_FORMAT = args.format_of_output
-OVERWRITE = args.overwrite_db
+OUT_FORMAT = args.output_format
+OVERWRITE = args.clobber_db
 
 run_files = {'query': args.query, 'subject': args.subject}
 
