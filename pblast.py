@@ -2,20 +2,22 @@
 
 """
 usage: pblast.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]] [-n NAME]
-                query subject {blastn,blastp,blastx,tblastn,tblastx}
+                 [-e E_VALUE]
+                 query subject {blastn,blastp,blastx,tblastn,tblastx}
 
-BLAST one file against another
+BLAST one file against another. Any arguments not listed here will be passed
+on to BLAST.
 
 positional arguments:
   query                 query file to be BLASTed
-  subject               subject file to be BLASTed
+  subject               subject file to be BLASTed against
   {blastn,blastp,blastx,tblastn,tblastx}
                         type of BLAST program to run
 
 optional arguments:
   -h, --help            show this help message and exit
   -t THREADS, --threads THREADS
-                        number of CPU threads to use (overridden if -p)
+                        number of CPU threads to use (overridden by -p)
                         (default: 4)
   -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
                         run the BLAST step using multiple parallel processes;
@@ -23,6 +25,8 @@ optional arguments:
                         CPUs (default: None)
   -n NAME, --name NAME  filename for results (otherwise, automatic) (default:
                         None)
+  -e E_VALUE, --e_value E_VALUE
+                        e-value threshold to use for search (default: 1e-10)
 
 """
 import sys
@@ -133,7 +137,8 @@ def local_blast(
         filename,
         out_fmt=6, 
         threads=1, 
-        e_value=1e-10):
+        e_value=1e-10,
+        extra_blast_args=None):
     """
     Runs BLAST+ sub-program (blastp, blastn, blastx, tblastn, tblastx)
     with the given query on the given database.
@@ -141,7 +146,11 @@ def local_blast(
     Optional: out_fmt = type as per BLAST+ documentation; threads = number
     of threads to use for job; e = e-value cutoff for hits
 
+    extra_blast_args is a list of additional arguments to pass to BLAST
+
     """
+    if extra_blast_args is None:
+        extra_blast_args = []  # make unpacking syntax work
     start_time = time.time()
     db_abbrev = abbreviate(db_file)
     query_abbrev = abbreviate(query_file)
@@ -161,6 +170,7 @@ def local_blast(
         filename,
         "-num_threads",
         threads,
+        *extra_blast_args
     ]
     cmd_args = [str(c) for c in cmd_args]
     cmd_string = ' '.join(cmd_args)
@@ -268,30 +278,36 @@ def parallel_blast(
         query, 
         blast_type, 
         e_value=1e-10, 
-        out_name=None):
+        out_name=None,
+        extra_blast_args=None):
     pool = Pool(PARALLEL)
-    blast = partial(local_blast, subject, blast_type, e_value=e_value)
-    count = 0
-    for h, s in fasta_parse(query):
-        count += 1
+    blast = partial(
+        local_blast, 
+        subject, 
+        blast_type, 
+        e_value=e_value, 
+        extra_blast_args=extra_blast_args)
+    # count = 0
+    # for h, s in fasta_parse(query):
+    #     count += 1
+    count = sum([1 for p in fasta_parse(query)])
     block_size = ceil(count / PARALLEL)
     chunk_name = '{}.{}.chunk'.format(query, 1)
     chunk = open(chunk_name, 'w')
     chunked = [chunk_name]
     tally = 1
     for index, (h, s) in enumerate(fasta_parse(query), start=1):   
-        if index % block_size == 0:
+        if index > block_size and index % block_size == 1:
             tally += 1
             # order matters here
             chunk.close()
             chunk_name = '{}.{}.chunk'.format(query, tally)
             chunked.append(chunk_name)
             chunk = open(chunk_name, 'w')
-            chunk.write('>{}\n{}\n'.format(h, s))
+            chunk.write('>{}\n{}\n'.format(h, s))                        
         else:
             chunk.write('>{}\n{}\n'.format(h, s))
     chunk.close()
-
     chunk_list = '\n'.join(chunked)    
     print('[#] Query split into {} files:\n{}\n'
           .format(len(chunked), chunk_list))
@@ -329,8 +345,11 @@ def concatenate(outname, file_list, clean=True):
 
 
 parser = argparse.ArgumentParser(
-    description='BLAST one file against another',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    description=(
+        'BLAST one file against another. '
+    'Any arguments not listed here will be passed on to BLAST.'),
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter, 
+    allow_abbrev=False)
 
 parser.add_argument(
     'query',
@@ -338,7 +357,7 @@ parser.add_argument(
 )
 parser.add_argument(
     'subject',
-    help='subject file to be BLASTed'
+    help='subject file to be BLASTed against'
 )
 parser.add_argument(
     'blast_type',
@@ -354,7 +373,7 @@ parser.add_argument(
     '-t',
     '--threads',
     type=int,
-    help='number of CPU threads to use (overridden if -p)',
+    help='number of CPU threads to use (overridden by -p)',
     default=4
 )
 parser.add_argument(
@@ -383,7 +402,7 @@ parser.add_argument(
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
-args = parser.parse_args()
+args, EXTRA_ARGS = parser.parse_known_args()
 
 BLAST_TYPE = args.blast_type
 THREADS = args.threads
@@ -414,7 +433,8 @@ if PARALLEL:
         QUERY, 
         BLAST_TYPE, 
         e_value=E_VALUE, 
-        out_name=OUT_NAME)
+        out_name=OUT_NAME,
+        extra_blast_args=EXTRA_ARGS)
     concatenate(OUT_NAME, pblast_out)
 else:
     blast_out = local_blast(
@@ -423,6 +443,7 @@ else:
         QUERY, 
         filename=OUT_NAME, 
         threads=THREADS,
-        e_value=E_VALUE)
+        e_value=E_VALUE,
+        extra_blast_args=EXTRA_ARGS)
 
 sys.exit(0)
