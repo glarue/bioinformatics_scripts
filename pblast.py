@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: pblast.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]] [-n NAME]
-                 [-e E_VALUE]
+usage: pblast.py [-h] [-p [PARALLEL_PROCESSES]] [-o OUTPUT_FORMAT]
+                 [-t THREADS] [-n NAME] [-e E_VALUE] [--clobber_db]
                  query subject {blastn,blastp,blastx,tblastn,tblastx}
 
 BLAST one file against another. Any arguments not listed here will be passed
@@ -16,18 +16,21 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -t THREADS, --threads THREADS
-                        number of CPU threads to use (overridden by -p)
-                        (default: 4)
   -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
                         run the BLAST step using multiple parallel processes;
                         without specific input will use half available system
                         CPUs (default: None)
-  -n NAME, --name NAME  filename for results (otherwise, automatic) (default:
-                        None)
+  -o OUTPUT_FORMAT, --output_format OUTPUT_FORMAT
+                        output format for BLAST results (default: 6)
+  -t THREADS, --threads THREADS
+                        number of CPU threads to use (overridden by -p)
+                        (default: 4)
+  -n NAME, --name NAME  filename for results (otherwise, automatic based on
+                        input) (default: None)
   -e E_VALUE, --e_value E_VALUE
                         e-value threshold to use for search (default: 1e-10)
-
+  --clobber_db          create new database even if one already exists
+                        (default: False)
 """
 import sys
 import subprocess
@@ -105,6 +108,23 @@ def abbreviate(name, delimiter="."):
     return abbreviation
 
 
+def db_check(db_filename):
+    db_directory = os.path.dirname(os.path.realpath(db_filename))
+    db_dir_files = os.listdir(db_directory)
+    db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
+    db_files = [
+        f for f in db_dir_files if f.startswith(db_filename) 
+        and f.endswith(db_endings)
+    ]
+    present_endings = [f[-2:] for f in db_files]
+    if all(dbe in present_endings for dbe in db_endings):
+        previous_db = True
+    else:
+        previous_db = False
+    
+    return previous_db
+
+
 def make_blast_db(fasta, db_type="nucleotide"):
     """
     Creates a local BLAST+ database using a
@@ -174,11 +194,12 @@ def local_blast(
     ]
     cmd_args = [str(c) for c in cmd_args]
     cmd_string = ' '.join(cmd_args)
-    print("[#] Starting BLAST search on '{}' vs. '{}':\n{}"
-          .format(query_file, db_file, cmd_string), file=sys.stderr)
+    vs = "'{}' vs. '{}'".format(query_file, db_file)
+    print("[#] Starting BLAST on {}:\n{}"
+          .format(vs, cmd_string), file=sys.stderr)
     subprocess.call(cmd_args)
     run_time = get_runtime(start_time)
-    print("[#] BLAST finished in {}".format(run_time), file=sys.stderr)
+    print("[#] BLAST on {} finished in {}".format(vs, run_time), file=sys.stderr)
     return filename
 
 
@@ -228,7 +249,7 @@ def make_pro(fasta, ftype=''):
     return out_name
 
 
-def prep_blast(subject, query, blast_type):
+def prep_blast(subject, query, blast_type, overwrite=True):
     db_type_map = {
         'blastn': {
             'query': 'nucleotide',
@@ -267,8 +288,15 @@ def prep_blast(subject, query, blast_type):
     subject = blast_files['subject']
     query = blast_files['query']
 
-    # make BLAST database
-    make_blast_db(subject, db_type=target_format['subject'])
+    # check for already-created database
+    if db_check(subject):
+        if overwrite:
+            make_blast_db(subject, db_type=target_format['subject'])
+        else:
+            print('[#] Using existing BLAST database for \'{}\''.format(query), 
+                  file=sys.stderr)
+    else:
+        make_blast_db(subject, db_type=target_format['subject'])
 
     return subject, query
 
@@ -276,7 +304,8 @@ def prep_blast(subject, query, blast_type):
 def parallel_blast(
         subject, 
         query, 
-        blast_type, 
+        blast_type,
+        out_fmt=6, 
         e_value=1e-10, 
         out_name=None,
         extra_blast_args=None):
@@ -284,12 +313,10 @@ def parallel_blast(
     blast = partial(
         local_blast, 
         subject, 
-        blast_type, 
+        blast_type,
+        out_fmt=out_fmt,
         e_value=e_value, 
         extra_blast_args=extra_blast_args)
-    # count = 0
-    # for h, s in fasta_parse(query):
-    #     count += 1
     count = sum([1 for p in fasta_parse(query)])
     block_size = ceil(count / PARALLEL)
     chunk_name = '{}.{}.chunk'.format(query, 1)
@@ -323,7 +350,7 @@ def parallel_blast(
     results = []
     for pair in zip(chunked, filenames):
         results.append(pool.apply_async(blast, args=pair))
-        time.sleep(.05)
+        time.sleep(.01)
     pool.close()
     pool.join()
     results = [r.get() for r in results]
@@ -370,13 +397,6 @@ parser.add_argument(
     help='type of BLAST program to run'
 )
 parser.add_argument(
-    '-t',
-    '--threads',
-    type=int,
-    help='number of CPU threads to use (overridden by -p)',
-    default=4
-)
-parser.add_argument(
     '-p',
     '--parallel_processes',
     help=('run the BLAST step using multiple parallel processes; '
@@ -386,10 +406,24 @@ parser.add_argument(
     nargs='?'
 )
 parser.add_argument(
+    '-o',
+    '--output_format',
+    type=int,
+    help='output format for BLAST results',
+    default=6
+)
+parser.add_argument(
+    '-t',
+    '--threads',
+    type=int,
+    help='number of CPU threads to use (overridden by -p)',
+    default=4
+)
+parser.add_argument(
     '-n',
     '--name',
     type=str,
-    help='filename for results (otherwise, automatic)'
+    help='filename for results (otherwise, automatic based on input)'
 )
 parser.add_argument(
     '-e',
@@ -397,6 +431,11 @@ parser.add_argument(
     help='e-value threshold to use for search',
     type=float,
     default=1e-10
+)
+parser.add_argument(
+    '--clobber_db',
+    help='create new database even if one already exists',
+    action='store_true'
 )
 
 if len(sys.argv) == 1:
@@ -409,6 +448,8 @@ THREADS = args.threads
 PARALLEL = args.parallel_processes
 OUT_NAME = args.name
 E_VALUE = args.e_value
+OUT_FORMAT = args.format_of_output
+OVERWRITE = args.overwrite_db
 
 run_files = {'query': args.query, 'subject': args.subject}
 
@@ -425,13 +466,14 @@ if not OUT_NAME:
         abbreviate(SUBJECT),
         BLAST_TYPE)
 
-SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE)
+SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE, overwrite=OVERWRITE)
 
 if PARALLEL:
     pblast_out = parallel_blast(
         SUBJECT, 
         QUERY, 
-        BLAST_TYPE, 
+        BLAST_TYPE,
+        out_fmt=OUT_FORMAT,
         e_value=E_VALUE, 
         out_name=OUT_NAME,
         extra_blast_args=EXTRA_ARGS)
@@ -440,7 +482,8 @@ else:
     blast_out = local_blast(
         SUBJECT, 
         BLAST_TYPE, 
-        QUERY, 
+        QUERY,
+        out_fmt=OUT_FORMAT,
         filename=OUT_NAME, 
         threads=THREADS,
         e_value=E_VALUE,
