@@ -109,13 +109,13 @@ def abbreviate(name, delimiter="."):
 
 
 def db_check(db_filename):
-    db_directory = os.path.dirname(os.path.realpath(db_filename))
-    db_dir_files = os.listdir(db_directory)
+    db_name = os.path.basename(db_filename)
+    # db_directory = os.path.dirname(os.path.realpath(db_filename))
+    db_dir_files = os.listdir()
     db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
-    db_files = [
-        f for f in db_dir_files if f.startswith(db_filename) 
-        and f.endswith(db_endings)
-    ]
+    db_files = [f.rsplit('.', 1) for f in db_dir_files]
+    # get just the file endings
+    db_files = [f[1] for f in db_files if f[0] == db_name]
     present_endings = [f[-2:] for f in db_files]
     if all(dbe in present_endings for dbe in db_endings):
         previous_db = True
@@ -469,6 +469,7 @@ if not OUT_NAME:
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE, overwrite=OVERWRITE)
 
 if PARALLEL:
+    # run multiple processes, and then join the output afterward
     pblast_out = parallel_blast(
         SUBJECT, 
         QUERY, 
