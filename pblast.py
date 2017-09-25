@@ -109,12 +109,12 @@ def abbreviate(name, delimiter="."):
 
 
 def db_check(db_filename):
-    db_name = os.path.basename(db_filename)
-    # db_directory = os.path.dirname(os.path.realpath(db_filename))
-    db_dir_files = os.listdir()
+    db_directory = os.path.dirname(os.path.abspath(db_filename))
+    db_dir_files = os.listdir(db_directory)
     db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
     db_files = [f.rsplit('.', 1) for f in db_dir_files]
     # get just the file endings
+    db_name = os.path.basename(db_filename)    
     db_files = [f[1] for f in db_files if f[0] == db_name]
     present_endings = [f[-2:] for f in db_files]
     if all(dbe in present_endings for dbe in db_endings):
