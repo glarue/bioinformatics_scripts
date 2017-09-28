@@ -78,7 +78,7 @@ def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
             seq = separator.join(str(e) for e in seq)
 
         yield header, seq
-
+        
 
 def get_runtime(start_time, p=3):
     """
@@ -293,8 +293,8 @@ def prep_blast(subject, query, blast_type, overwrite=True):
         if overwrite:
             make_blast_db(subject, db_type=target_format['subject'])
         else:
-            print('[#] Using existing BLAST database for \'{}\''.format(query), 
-                  file=sys.stderr)
+            print('[#] Using existing BLAST database for \'{}\''
+            .format(subject), file=sys.stderr)
     else:
         make_blast_db(subject, db_type=target_format['subject'])
 
