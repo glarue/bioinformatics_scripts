@@ -45,7 +45,7 @@ $ seq_from_fasta.py dummy.fasta one
 11111111111111111111111111111111111111111111111111111111111111111111111111111111
 ```
 
-`seq_from_fasta.py` will reformat the sequence for headers with multiple lines per sequence by default:
+For headers that have sequences across multiple lines, `seq_from_fasta.py` will output the sequence in a single line by default:
 
 ```
 $ seq_from_fasta.py dummy.fasta three
