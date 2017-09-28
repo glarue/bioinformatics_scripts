@@ -247,7 +247,8 @@ def add_name(name, email, config):
 
 
 def view_config(config):
-    subprocess.run(['cat', config])
+    with open(config) as f:
+        print(f.read(), end='')
 
 
 def send_ssl_mail(
