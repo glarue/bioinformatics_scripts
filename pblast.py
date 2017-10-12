@@ -188,8 +188,6 @@ def local_blast(
         out_fmt,
         "-out",
         filename,
-        "-num_threads",
-        threads,
         *extra_blast_args
     ]
     cmd_args = [str(c) for c in cmd_args]
@@ -374,7 +372,7 @@ def concatenate(outname, file_list, clean=True):
 parser = argparse.ArgumentParser(
     description=(
         'BLAST one file against another. '
-    'Any arguments not listed here will be passed on to BLAST.'),
+    'Any arguments not listed here will be passed to BLAST unmodified.'),
     formatter_class=argparse.ArgumentDefaultsHelpFormatter, 
     allow_abbrev=False)
 
@@ -400,24 +398,24 @@ parser.add_argument(
     '-p',
     '--parallel_processes',
     help=('run the BLAST step using multiple parallel processes; '
-          'without specific input will use half available system CPUs'),
+          'without specific input will use half of available system CPUs'),
     type=int,
     const=round(cpu_count() / 2),
-    nargs='?'
+    nargs='?',
+    default=round(cpu_count() / 2)
+)
+parser.add_argument(
+    '-s',
+    '--single',
+    help='disable parallel processing',
+    action='store_true'
 )
 parser.add_argument(
     '-o',
     '--output_format',
     type=int,
-    help='output format for BLAST results',
+    help='integer output format for BLAST results',
     default=6
-)
-parser.add_argument(
-    '-t',
-    '--threads',
-    type=int,
-    help='number of CPU threads to use (overridden by -p)',
-    default=4
 )
 parser.add_argument(
     '-n',
@@ -444,8 +442,9 @@ if len(sys.argv) == 1:
 args, EXTRA_ARGS = parser.parse_known_args()
 
 BLAST_TYPE = args.blast_type
-THREADS = args.threads
+# THREADS = args.threads
 PARALLEL = args.parallel_processes
+SINGLE = args.single
 OUT_NAME = args.name
 E_VALUE = args.e_value
 OUT_FORMAT = args.output_format
@@ -468,7 +467,7 @@ if not OUT_NAME:
 
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE, overwrite=OVERWRITE)
 
-if PARALLEL:
+if not SINGLE and PARALLEL > 1: #PARALLEL:
     # run multiple processes, and then join the output afterward
     pblast_out = parallel_blast(
         SUBJECT, 
@@ -486,7 +485,6 @@ else:
         QUERY,
         out_fmt=OUT_FORMAT,
         filename=OUT_NAME, 
-        threads=THREADS,
         e_value=E_VALUE,
         extra_blast_args=EXTRA_ARGS)
 
