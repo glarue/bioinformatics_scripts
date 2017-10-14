@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 """
-usage: pblast.py [-h] [-p [PARALLEL_PROCESSES]] [-o OUTPUT_FORMAT]
-                 [-t THREADS] [-n NAME] [-e E_VALUE] [--clobber_db]
+usage: pblast.py [-h] [-p [PARALLEL_PROCESSES]] [-s] [-o OUTPUT_FORMAT]
+                 [-n NAME] [-e E_VALUE] [--clobber_db]
                  query subject {blastn,blastp,blastx,tblastn,tblastx}
 
 BLAST one file against another. Any arguments not listed here will be passed
-on to BLAST.
+to BLAST unmodified.
 
 positional arguments:
   query                 query file to be BLASTed
@@ -18,13 +18,11 @@ optional arguments:
   -h, --help            show this help message and exit
   -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
                         run the BLAST step using multiple parallel processes;
-                        without specific input will use half available system
-                        CPUs (default: None)
+                        without specific input will use half of available
+                        system CPUs
+  -s, --single          disable parallel processing (default: False)
   -o OUTPUT_FORMAT, --output_format OUTPUT_FORMAT
-                        output format for BLAST results (default: 6)
-  -t THREADS, --threads THREADS
-                        number of CPU threads to use (overridden by -p)
-                        (default: 4)
+                        integer output format for BLAST results (default: 6)
   -n NAME, --name NAME  filename for results (otherwise, automatic based on
                         input) (default: None)
   -e E_VALUE, --e_value E_VALUE
