@@ -273,22 +273,22 @@ def send_ssl_mail(
         msg['Subject'] = subject
     if body:
         msg.attach(MIMEText(body, 'plain'))
-    # server = smtplib.SMTP_SSL(server_address, port)  # stopped working w/ namecheap
     try:
-        server = smtplib.SMTP(server_address, port)
+        server = smtplib.SMTP_SSL(server_address, port)
     except smtplib.SMTPConnectError:
+        print('[#] Server connection error - retrying', file=sys.stderr)
         time.sleep(10)
-        server = smtplib.SMTP(server_address, port)
+        server = smtplib.SMTP_SSL(server_address, port)
     retries = 2
     success = False
     while retries > 0:  # in case server rejects attempt
-        server.starttls()   # not used for SMTP_SSL class
+        # server.starttls()  # not used for SMTP_SSL class
         try:
             server.login(from_address, password)
             success = True
         except:
             server.quit()
-            time.sleep(60)  # sleep for 1 minute
+            time.sleep(30)  # sleep for 30 seconds
             retries -= 1
             continue
         break
