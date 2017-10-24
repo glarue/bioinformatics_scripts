@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: auto_dump.py [-h] [-f FILE] [-k] [accessions [accessions ...]]
+usage: fasterq_dump.py [-h] [-f FILE] [-k] [accessions [accessions ...]]
 
 A program to run fastq-dump sequentially on a list of accession numbers. Will
 automatically detect if reads are single- or paired-end and will run fastq-

@@ -1,4 +1,4 @@
-# __`auto_dump.py`__
+# __`fasterq_dump.py`__
 
 ## __[tl;dr]__
 
@@ -6,7 +6,7 @@ Downloads sequencing data in FASTQ format from the [NCBI Short Read Archive](htt
 
 ## __[details]__
 
-`auto_dump.py` is a wrapper script for NCBI's SRA-to-FASTQ conversion program `fastq-dump`, part of its [SRA-Tools package](http://ncbi.github.io/sra-tools/). `auto_dump.py` has the following advantages over vanilla `fastq-dump`:
+`fasterq_dump.py` is a wrapper script for NCBI's SRA-to-FASTQ conversion program `fastq-dump`, part of its [SRA-Tools package](http://ncbi.github.io/sra-tools/). `fasterq_dump.py` has the following advantages over vanilla `fastq-dump`:
 * it is generally faster*
 * it auto-detects read type – either single- or paired-end – and splits the output accordingly
 * it formats the read IDs in paired-end data for compatability with Trinity (appending /1 or /2 to the ends of the IDs)
@@ -23,10 +23,10 @@ Downloads sequencing data in FASTQ format from the [NCBI Short Read Archive](htt
 
 ## __[example usage]__
 
-To obtain RNA-seq reads for [this small ebola dataset](https://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?run=SRR3359559), run `auto_dump.py` on the corresponding accession number (SRR3359559), which will result in the following output:
+To obtain RNA-seq reads for [this small ebola dataset](https://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?run=SRR3359559), run `fasterq_dump.py` on the corresponding accession number (SRR3359559), which will result in the following output:
 
 ```console
-$ auto_dump.py SRR3359559
+$ fasterq_dump.py SRR3359559
 --2017-07-04 13:38:55--  ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/SRR/SRR335/SRR3359559/SRR3359559.sra
            => ‘SRR3359559.sra’
 Resolving ftp-trace.ncbi.nlm.nih.gov (ftp-trace.ncbi.nlm.nih.gov)... 130.14.250.10, 2607:f220:41e:250::11
@@ -52,7 +52,7 @@ Written 4481 spots for SRR3359559.sra
 To retrieve multiple runs from the same experiment, multiple accessions may be listed as command line arguments,
 
 ```
-$ auto_dump.py SRR3359557-SRR3359559
+$ fasterq_dump.py SRR3359557-SRR3359559
 ```
 
 which will result in a corresponding set of paired FASTQ files:
@@ -67,9 +67,9 @@ which will result in a corresponding set of paired FASTQ files:
 
 ```
 
-Run `auto_dump.py` without arguments for further usage information.
+Run `fasterq_dump.py` without arguments for further usage information.
 
 
 ## __[background]__
 
-Based on in-house testing, downloading the SRA file directly (via `wget`) and then using `fastq-dump` locally is often significantly faster than using the automated downloading capabilities of `fastq-dump`. In addition, users may often want to retrieve multiple datasets in one fell swoop; while this could be achieved using a relatively simple Bash loop, user familarity with Bash is variable and the syntax of `auto_dumpy.py` is likely simpler.
+Based on in-house testing, downloading the SRA file directly (via `wget`) and then using `fastq-dump` locally is often significantly faster than using the automated downloading capabilities of `fastq-dump`. In addition, users may often want to retrieve multiple datasets in one fell swoop; while this could be achieved using a relatively simple Bash loop, user familarity with Bash is variable and the syntax of `fasterq_dumpy.py` is likely simpler.
