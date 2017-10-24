@@ -3,7 +3,7 @@
 These scripts are relatively mature and well-documented, and should be useful
 to a somewhat wider audience than just their author.
 
-### `auto_dump.py`
+### `fasterq_dump.py`
 Run NCBI's `fastq-dump` on one or more accession numbers faster than normal
 
 ### `cmdlog.py`
