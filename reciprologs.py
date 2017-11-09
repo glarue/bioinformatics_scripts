@@ -198,13 +198,6 @@ parser.add_argument(
     help='type of BLAST program to run'
 )
 parser.add_argument(
-    '-t',
-    '--threads',
-    type=int,
-    help='number of CPU threads to use (overridden by -p)',
-    default=4
-)
-parser.add_argument(
     '-p',
     '--parallel_processes',
     help=('run the BLAST step using multiple parallel processes; '
@@ -219,10 +212,9 @@ if len(sys.argv) == 1:
 
 t_start = time.time()
 
-args = parser.parse_args()
+args, EXTRA_ARGS = parser.parse_known_args()
 
 BLAST_TYPE = args.blast_type
-THREADS = args.threads
 PARALLEL = args.parallel_processes
 QUERY = args.file_1
 SUBJECT = args.file_2
@@ -246,10 +238,9 @@ rv_fn = '{}-{}.{}.blast_results'.format(*rv_names, BLAST_TYPE)
 # create a list with the flags/options to pass to the subsequence
 # subprocess calls
 call_options = {
-    '-p': PARALLEL,
-    '-t': THREADS,
+    '-p': PARALLEL
 }
-optional = []
+optional = EXTRA_ARGS
 for k, v in call_options.items():
     if v:
         optional.extend([str(k), str(v)])
