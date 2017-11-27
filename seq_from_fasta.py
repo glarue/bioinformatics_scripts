@@ -66,6 +66,7 @@ def fasta_parse(fasta, delimiter=">", separator="", trim_header=False):
             seq = separator.join(str(e) for e in seq)
         yield header, seq
 
+
 def demarcate(string, left_margin, right_margin, separator='|'):
     """
     Adds "|" characters to both ends of an input
@@ -78,6 +79,7 @@ def demarcate(string, left_margin, right_margin, separator='|'):
         if i != 0:
             stringList.insert(i, separator)
     return "".join(stringList)
+
 
 def reverse_complement(seq):
     rev_list = []
@@ -94,6 +96,7 @@ def reverse_complement(seq):
     rev_seq = ''.join(reversed(rev_list))
 
     return rev_seq
+
 
 def get_subseq(parent_seq, start, stop, flank=0):
     """
@@ -112,6 +115,7 @@ def get_subseq(parent_seq, start, stop, flank=0):
     out_string = parent_seq[start-l_flank:stop+r_flank]
     return out_string, l_flank, r_flank
 
+
 def line_from_args(args):
     """
     Formats cmd-line arguments to match file line
@@ -119,6 +123,7 @@ def line_from_args(args):
 
     """
     return "\t".join(args)
+
 
 def line_to_info(line):
     bits = line.strip().split()
@@ -135,6 +140,7 @@ def line_to_info(line):
                  "label": label}
     return line_info
 
+
 def seq_from_line(parent_seq, line):
     info = line_to_info(line)
     seq, l_flank, r_flank = get_subseq(
@@ -144,6 +150,7 @@ def seq_from_line(parent_seq, line):
     if FLANK:
         seq = demarcate(seq, l_flank, r_flank)
     return seq
+
 
 def info_from_file(list_file):
     records = {}
@@ -156,9 +163,11 @@ def info_from_file(list_file):
             records[loc].append(l)
     return records
 
+
 def info_from_args(args):
     loc = args[0]
     return {loc: [line_from_args(args)]}
+
 
 def seqs_from_fasta(fasta, line_dict):
     num_keys = len(line_dict.keys())
@@ -178,6 +187,7 @@ def seqs_from_fasta(fasta, line_dict):
                 yield seq, line_to_info(line)
             if num_keys == 0:
                 break
+
 
 parser = argparse.ArgumentParser(
     description=(
