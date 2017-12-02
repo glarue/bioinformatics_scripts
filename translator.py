@@ -126,7 +126,8 @@ def translate_seq(
         'TTT': ('F', 'Phe', 'Phenylalanine'),
         'TAA': (stop_char, stop_char, 'STOP'),
         'TAG': (stop_char, stop_char, 'STOP'),
-        'TGA': (stop_char, stop_char, 'STOP')
+        'TGA': (stop_char, stop_char, 'STOP'),
+        '---': ('-', '-', 'GAP')
     }
 
     def get_codons(s, p=0):
