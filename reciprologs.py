@@ -226,6 +226,11 @@ parser.add_argument(
     type=float,
     default=None
 )
+parser.add_argument(
+    '--overwrite',
+    help='overwrite existing BLAST files (instead of using to bypass BLAST)',
+    action='store_true'
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -239,6 +244,7 @@ PARALLEL = args.parallel_processes
 QUERY = args.file_1
 SUBJECT = args.file_2
 QUERY_PERCENTAGE = args.query_percentage_threshold
+OVERWRITE = args.overwrite
 
 BLAST = 'pblast.py'
 
@@ -275,17 +281,25 @@ for k, v in call_options.items():
     if v:
         optional.extend([str(k), str(v)])
 
-forward_args = [BLAST, QUERY, SUBJECT, BLAST_TYPE, '-n', fw_fn] + optional
-subprocess.run(forward_args)
-top_forward = get_top_hits(fw_fn, PARALOGS)
-if PARALOGS:
-    # filter for reciprocal best hits within the same file
-    top_reverse = top_forward
-    # reciprologs = get_reciprocals(top_forward, top_forward)
+# use existing BLAST output unless --overwrite is specified
+if not os.path.isfile(fw_fn) or OVERWRITE:
+    forward_args = [BLAST, QUERY, SUBJECT, BLAST_TYPE, '-n', fw_fn] + optional
+    subprocess.run(forward_args)
 else:
-    reverse_args = [BLAST, SUBJECT, QUERY, BLAST_TYPE, '-n', rv_fn] + optional
-    subprocess.run(reverse_args)
-    top_reverse = get_top_hits(rv_fn)
+    print('[#] Using existing BLAST output \'{}\''.format(fw_fn))
+top_forward = get_top_hits(
+    fw_fn, PARALOGS, query_match=q_lengths)
+if PARALOGS:
+    # don't need to run BLAST again; process the same file
+    top_reverse = get_top_hits(
+        fw_fn, PARALOGS, query_match=s_lengths)
+else:
+    if not os.path.isfile(rv_fn) or OVERWRITE:
+        reverse_args = [BLAST, SUBJECT, QUERY, BLAST_TYPE, '-n', rv_fn] + optional
+        subprocess.run(reverse_args)    
+    else:
+        print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
+    top_reverse = get_top_hits(rv_fn, query_match=s_lengths)
 
 # Filter for reciprocal best hits
 reciprologs = get_reciprocals(top_forward, top_reverse)
