@@ -102,11 +102,13 @@ def parse_blast_line(bl, *args):
 
     """
     columns = bl.strip().split("\t")
-    query, subject, length, e_value, bitscore = itemgetter(0, 1, 4, 10, 11)(columns)
+    (query, subject, length, 
+    e_value, bitscore, q_start,
+    q_stop) = itemgetter(0, 1, 3, 10, 11, 6, 7)(columns)
     arg_map = {
         "query": query,
         "subject": subject,
-        "length": length,
+        "length": int(length) - 1,  # seem to be off by 1 in BLAST output
         "e": float(e_value),
         "bitscore": float(bitscore)
     }
@@ -118,16 +120,24 @@ def parse_blast_line(bl, *args):
     return results
 
 
-def get_top_hits(blast, paralogs=False):
+def get_top_hits(blast, paralogs=False, query_match=None):
     results = {}
     with open(blast) as blst:
         for l in blst:
             if l.startswith("#"):
                 continue
-            q, s, score = parse_blast_line(l, "query", "subject", "bitscore")
+            (q, s, score, length) = parse_blast_line(
+                l, "query", "subject", "bitscore", "length")
             # do not consider hits to self if BLASTing against self
             if paralogs and q == s:
                 continue
+            if query_match:
+                # use query_match dictionary to compare query lengths to
+                # match lengths to exclude matches where query percentage 
+                # is below query_match_threshold key
+                fraction = (length / query_match[q]) * 100
+                if fraction < query_match['query_match_threshold']:
+                    continue
             if q in results:
                 # Check if this hit's score is better
                 defender = results[q]["score"]
@@ -200,11 +210,21 @@ parser.add_argument(
 parser.add_argument(
     '-p',
     '--parallel_processes',
-    help=('run the BLAST step using multiple parallel processes; '
-          'without specific input will use half available system CPUs'),
+    help=(
+        'run the BLAST step using multiple parallel processes; '
+        'without specific input will use half available system CPUs'),
     type=int,
     const=round(cpu_count() / 2),
     nargs='?'
+)
+parser.add_argument(
+    '-t',
+    '--query_percentage_threshold',
+    help=(
+        'require a specified fraction of the query length to match in '
+        'order for a hit to qualify (lowest allowable percentage'),
+    type=float,
+    default=None
 )
 
 if len(sys.argv) == 1:
@@ -218,6 +238,7 @@ BLAST_TYPE = args.blast_type
 PARALLEL = args.parallel_processes
 QUERY = args.file_1
 SUBJECT = args.file_2
+QUERY_PERCENTAGE = args.query_percentage_threshold
 
 BLAST = 'pblast.py'
 
@@ -226,6 +247,15 @@ if QUERY == SUBJECT:
     PARALOGS = True
 else:
     PARALOGS = False
+
+q_lengths, s_lengths = {}, {}
+if QUERY_PERCENTAGE:
+    # we need to get sequence lengths for each file
+    for fa, target in zip([QUERY, SUBJECT], [q_lengths, s_lengths]):
+        target['query_match_threshold'] = QUERY_PERCENTAGE
+        for h, s in fasta_parse(fa):
+            target[h] = len(s)
+
 
 # BLAST in both directions (unless PARALOGS)
 
