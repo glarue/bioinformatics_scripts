@@ -230,9 +230,6 @@ parser.add_argument(
     help="match on full header string (including whitespace)"
 )
 
-if len(sys.argv) == 1:
-    sys.exit(parser.print_help())
-
 args = parser.parse_args()
 
 FASTA = args.FASTA_file
