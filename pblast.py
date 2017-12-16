@@ -37,7 +37,7 @@ import time
 import argparse
 from multiprocessing import Pool, cpu_count
 from functools import partial
-from math import ceil
+from math import ceil, log
 
 def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
     """
@@ -315,7 +315,10 @@ def parallel_blast(
         extra_blast_args=extra_blast_args)
     count = sum([1 for p in fasta_parse(query)])
     block_size = ceil(count / PARALLEL)
-    chunk_name = '{}.{}.chunk'.format(query, 1)
+    # change padding depth according to total number of chunks
+    zero_pad = ceil(log(PARALLEL + 1, 10))
+    chunk_name_scheme = '{0}.{1:0{2}}.chunk'
+    chunk_name = chunk_name_scheme.format(query, 1, zero_pad)
     chunk = open(chunk_name, 'w')
     chunked = [chunk_name]
     tally = 1
@@ -324,7 +327,7 @@ def parallel_blast(
             tally += 1
             # order matters here
             chunk.close()
-            chunk_name = '{}.{}.chunk'.format(query, tally)
+            chunk_name = chunk_name_scheme.format(query, tally, zero_pad)
             chunked.append(chunk_name)
             chunk = open(chunk_name, 'w')
             chunk.write('>{}\n{}\n'.format(h, s))                        
