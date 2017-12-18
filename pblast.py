@@ -341,7 +341,7 @@ def parallel_blast(
         out_name = '{}-{}.{}.blast_results'.format(
             abbreviate(query), abbreviate(subject), blast_type)
     filenames = [
-        '{}.{}.tmp'.format(out_name, i) 
+        '{0}.{1:0{2}}.tmp'.format(out_name, i, zero_pad) 
         for i in range(1, len(chunked) + 1)
         ]
     # use apply_async instead of starmap to allow messages
