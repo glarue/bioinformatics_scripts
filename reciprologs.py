@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: reciprologs.py [-h] [-t THREADS] [-p [PARALLEL_PROCESSES]]
+usage: reciprologs.py [-h] [-p [PARALLEL_PROCESSES]]
+                      [-t QUERY_PERCENTAGE_THRESHOLD] [--overwrite]
                       file_1 file_2 {blastn,blastp,blastx,tblastn,tblastx}
 
 Uses BLAST to find reciprocal best hits between two files.
@@ -14,13 +15,16 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -t THREADS, --threads THREADS
-                        number of CPU threads to use (overridden by -p)
-                        (default: 4)
   -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
                         run the BLAST step using multiple parallel processes;
                         without specific input will use half available system
                         CPUs (default: None)
+  -t QUERY_PERCENTAGE_THRESHOLD, --query_percentage_threshold QUERY_PERCENTAGE_THRESHOLD
+                        require a specified fraction of the query length to
+                        match in order for a hit to qualify (lowest allowable
+                        percentage (default: None)
+  --overwrite           overwrite existing BLAST files (instead of using to
+                        bypass BLAST) (default: False)
 
 NOTE: Depends on pblast.py
 
