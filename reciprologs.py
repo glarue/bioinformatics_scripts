@@ -120,15 +120,17 @@ def parse_blast_line(bl, *args):
     return results
 
 
-def get_top_hits(blast, paralogs=False, query_match=None):
+def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
     results = {}
     with open(blast) as blst:
         for l in blst:
+            new_best_hit = False
             if l.startswith("#"):
                 continue
             (q, s, score, length) = parse_blast_line(
                 l, "query", "subject", "bitscore", "length")
-            # do not consider hits to self if BLASTing against self
+            # do not consider hits to self if BLASTing against self,
+            # but allow query/subject names to be the same
             if paralogs and q == s:
                 continue
             if query_match:
@@ -140,10 +142,24 @@ def get_top_hits(blast, paralogs=False, query_match=None):
                     continue
             if q in results:
                 # Check if this hit's score is better
-                defender = results[q]["score"]
-                if score > defender:
-                    results[q] = {"name": s, "score": score}
+                defender_score = results[q]["score"]
+                if score > defender_score:
+                    new_best_hit = True
+                    # results[q] = {"name": s, "score": score}
+                # if scores are equal, check if sequence lenths
+                # have been provided as an additional tiebreaking
+                # criteria and look up the subject length to
+                # see if there's a difference
+                elif score == defender_score and seq_lengths is not None:
+                    defender_name = results[q]['name']
+                    defender_length = seq_lengths[defender_name]
+                    current_length = seq_lengths[s]
+                    if current_length > defender_length:
+                        new_best_hit = True
             else:
+                new_best_hit = True
+
+            if new_best_hit is True:
                 results[q] = {"name": s, "score": score}
 
     return results
@@ -255,13 +271,20 @@ else:
     PARALOGS = False
 
 q_lengths, s_lengths = {}, {}
-if QUERY_PERCENTAGE:
-    # we need to get sequence lengths for each file
-    for fa, target in zip([QUERY, SUBJECT], [q_lengths, s_lengths]):
-        target['query_match_threshold'] = QUERY_PERCENTAGE
-        for h, s in fasta_parse(fa):
-            target[h] = len(s)
+# we need to get sequence lengths for each file
+# for tie-breaking by length and QUERY_PERCENTAGE
+for fa, target in zip([QUERY, SUBJECT], [q_lengths, s_lengths]):
+    target['query_match_threshold'] = QUERY_PERCENTAGE
+    for h, s in fasta_parse(fa):
+        target[h] = len(s)
 
+# dictionaries are used as flag in top hits function
+# so need to be set here
+if not QUERY_PERCENTAGE:
+    qm_q, qm_s = {}, {}
+else:
+    qm_q = q_lengths
+    qm_s = s_lengths 
 
 # BLAST in both directions (unless PARALOGS)
 
@@ -288,7 +311,7 @@ if not os.path.isfile(fw_fn) or OVERWRITE:
 else:
     print('[#] Using existing BLAST output \'{}\''.format(fw_fn))
 top_forward = get_top_hits(
-    fw_fn, PARALOGS, query_match=q_lengths)
+    fw_fn, PARALOGS, query_match=qm_q, seq_lengths=s_lengths)
 if PARALOGS:
     # don't need to run BLAST again; process the same file
     top_reverse = get_top_hits(
@@ -299,7 +322,8 @@ else:
         subprocess.run(reverse_args)    
     else:
         print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
-    top_reverse = get_top_hits(rv_fn, query_match=s_lengths)
+    top_reverse = get_top_hits(
+        rv_fn, query_match=qm_s, seq_lengths=q_lengths)
 
 # Filter for reciprocal best hits
 reciprologs = get_reciprocals(top_forward, top_reverse)
