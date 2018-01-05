@@ -33,9 +33,11 @@ import sys
 import subprocess
 import os
 import time
-from operator import itemgetter
 import argparse
+from operator import itemgetter
 from multiprocessing import cpu_count
+from collections import defaultdict
+from itertools import combinations, permutations
 
 
 def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
@@ -190,9 +192,17 @@ def get_reciprocals(d1, d2):
 
 
 def abbreviate(name, delimiter="."):
-    name = name.split("/")[-1]  # in case of non-local file path
+    name = os.path.basename(name)  # in case of non-local file path
     abbreviation = name.split(delimiter)[0]
     return abbreviation
+
+
+def unique_filenames(*file_list):
+    abbreviated = [abbreviate(f) for f in file_list]
+    if len(set(abbreviated)) < len(abbreviated):  # not all are unique
+        return [os.path.basename(f) for f in file_list]
+    else:
+        return abbreviated
 
 
 def concatenate(outname, file_list, clean=True):
@@ -203,19 +213,170 @@ def concatenate(outname, file_list, clean=True):
                     outfile.write(l)
     if clean:
         [os.remove(fn) for fn in file_list]
+
+
+def make_ortho_dict(*orthos):
+    """
+    IN:
+    [
+        [('a', 'b'), ('a', 'c'), ('a', 'd')],
+        [('b', 'c'), ('b', 'e'), ('b', 'f')],
+        [('c', 'e'), ('c', 'f'), ('c', 'g')],
+        [('z', 'x'), ('z', 'y'), ('z', 'w')]
+    ]
+    OUT:
+    defaultdict(set,
+            {'a': {'b', 'c', 'd'},
+             'b': {'a', 'c', 'e', 'f'},
+             'c': {'a', 'b', 'e', 'f', 'g'},
+             'd': {'a'},
+             'e': {'b', 'c'},
+             'f': {'b', 'c'},
+             'g': {'c'},
+             'w': {'z'},
+             'x': {'z'},
+             'y': {'z'},
+             'z': {'w', 'x', 'y'}})
     
+    """
+    collector = defaultdict(set)
+    for o_list in orthos:
+        for pair in o_list:
+            for a, b in permutations(pair, 2):
+                collector[a].add(b)
+    return collector
+
+
+def aggregate_dict(ortho_dict):
+    """
+    IN:
+    defaultdict(set,
+            {'a': {'b', 'c', 'd'},
+             'b': {'a', 'c', 'e', 'f'},
+             'c': {'a', 'b', 'e', 'f', 'g'},
+             'd': {'a'},
+             'e': {'b', 'c'},
+             'f': {'b', 'c'},
+             'g': {'c'},
+             'w': {'z'},
+             'x': {'z'},
+             'y': {'z'},
+             'z': {'w', 'x', 'y'}})
+    OUT:
+    defaultdict(set, {'a': {'b', 'c', 'd', 'e', 'f', 'g'}, 'z': {'w', 'x', 'y'}})
+    
+    """
+    changed = False
+    processed = []
+    master = defaultdict(set)
+    for k, v in ortho_dict.items():
+        if k in processed:
+            continue
+        processed.append(k)
+        for v2 in v:
+            if v2 == k:
+                continue
+            master[k].add(v2)
+            processed.append(v2)
+            if v2 not in ortho_dict:
+                continue
+            changed = True
+            master[k].update(ortho_dict[v2])
+    if changed is True:
+        master = aggregate_dict(master)
+    return master
+
+
+def aggregate_orthos(orthos):
+    """
+    IN:
+    [
+        [('a', 'b'), ('a', 'c'), ('a', 'd')],
+        [('b', 'c'), ('b', 'e'), ('b', 'f')],
+        [('c', 'e'), ('c', 'f'), ('c', 'g')],
+        [('z', 'x'), ('z', 'y'), ('z', 'w')]
+    ]
+    OUT:
+    [['a', 'b', 'c', 'd', 'e', 'f', 'g'], ['w', 'x', 'y', 'z']]
+    
+    """
+    o_dict = make_ortho_dict(*orthos)
+    aggregated = aggregate_dict(o_dict)
+    ortho_groups = []
+    for k, v in aggregated.items():
+        combined = tuple(v) + (k,)
+        ortho_groups.append(sorted(combined))
+    
+    return sorted(ortho_groups)
+
+
+def pair_reciprologs(query, subject, blast_type, qp, extra):
+    # special case of BLASTing against self
+    if query == subject:
+        PARALOGS = True
+    else:
+        PARALOGS = False
+
+    q_lengths, s_lengths = {}, {}
+    # we need to get sequence lengths for each file
+    # for tie-breaking by length and qp
+    for fa, target in zip([query, subject], [q_lengths, s_lengths]):
+        target['query_match_threshold'] = qp
+        for h, s in fasta_parse(fa):
+            target[h] = len(s)
+
+    # dictionaries are used as flag in top hits function
+    # so need to be set here
+    if not qp:
+        qm_q, qm_s = {}, {}
+    else:
+        qm_q = q_lengths
+        qm_s = s_lengths 
+
+    # BLAST in both directions (unless PARALOGS)
+    fw_names = unique_filenames(query, subject)
+    rv_names = fw_names[::-1]
+
+    fw_fn = '{}-{}.{}.blast_results'.format(*fw_names, blast_type)
+    rv_fn = '{}-{}.{}.blast_results'.format(*rv_names, blast_type)
+
+    # use existing BLAST output unless --overwrite is specified
+    if not os.path.isfile(fw_fn) or OVERWRITE:
+        forward_args = [BLAST, query, subject, blast_type, '-n', fw_fn] + extra
+        subprocess.run(forward_args)
+    else:
+        print('[#] Using existing BLAST output \'{}\''.format(fw_fn))
+    top_forward = get_top_hits(
+        fw_fn, PARALOGS, query_match=qm_q, seq_lengths=s_lengths)
+    if PARALOGS:
+        # don't need to run BLAST again; process the same file
+        top_reverse = get_top_hits(
+            fw_fn, PARALOGS, query_match=s_lengths)
+    else:
+        if not os.path.isfile(rv_fn) or OVERWRITE:
+            reverse_args = [BLAST, subject, query, blast_type, '-n', rv_fn] + extra
+            subprocess.run(reverse_args)    
+        else:
+            print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
+        top_reverse = get_top_hits(
+            rv_fn, query_match=qm_s, seq_lengths=q_lengths)
+
+    # Filter for reciprocal best hits
+    reciprocal_hits = get_reciprocals(top_forward, top_reverse)
+
+    return reciprocal_hits
+
 
 parser = argparse.ArgumentParser(
-    description='Uses BLAST to find reciprocal best hits between two files.',
+    description=(
+        'Uses BLAST to find reciprocal best hits '
+        'between two or more files.'),
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument(
-    'file_1',
-    help='file to BLAST',
-)
-parser.add_argument(
-    'file_2',
-    help='file to BLAST'
+    'input_files',
+    help='files to use to build reciprolog sets',
+    nargs='+'
 )
 parser.add_argument(
     'blast_type',
@@ -261,42 +422,15 @@ args, EXTRA_ARGS = parser.parse_known_args()
 
 BLAST_TYPE = args.blast_type
 PARALLEL = args.parallel_processes
-QUERY = args.file_1
-SUBJECT = args.file_2
+# QUERY = args.file_1
+# SUBJECT = args.file_2
+INPUT_FILES = args.input_files
+if len(INPUT_FILES) < 2:
+    sys.exit('error: too few files specified (need >1)')
 QUERY_PERCENTAGE = args.query_percentage_threshold
 OVERWRITE = args.overwrite
 
 BLAST = 'pblast.py'
-
-# special case of BLASTing against self
-if QUERY == SUBJECT:
-    PARALOGS = True
-else:
-    PARALOGS = False
-
-q_lengths, s_lengths = {}, {}
-# we need to get sequence lengths for each file
-# for tie-breaking by length and QUERY_PERCENTAGE
-for fa, target in zip([QUERY, SUBJECT], [q_lengths, s_lengths]):
-    target['query_match_threshold'] = QUERY_PERCENTAGE
-    for h, s in fasta_parse(fa):
-        target[h] = len(s)
-
-# dictionaries are used as flag in top hits function
-# so need to be set here
-if not QUERY_PERCENTAGE:
-    qm_q, qm_s = {}, {}
-else:
-    qm_q = q_lengths
-    qm_s = s_lengths 
-
-# BLAST in both directions (unless PARALOGS)
-
-fw_names = [abbreviate(QUERY), abbreviate(SUBJECT)]
-rv_names = fw_names[::-1]
-
-fw_fn = '{}-{}.{}.blast_results'.format(*fw_names, BLAST_TYPE)
-rv_fn = '{}-{}.{}.blast_results'.format(*rv_names, BLAST_TYPE)
 
 # create a list with the flags/options to pass to the subsequence
 # subprocess calls
@@ -308,41 +442,27 @@ for k, v in call_options.items():
     if v:
         optional.extend([str(k), str(v)])
 
-# use existing BLAST output unless --overwrite is specified
-if not os.path.isfile(fw_fn) or OVERWRITE:
-    forward_args = [BLAST, QUERY, SUBJECT, BLAST_TYPE, '-n', fw_fn] + optional
-    subprocess.run(forward_args)
-else:
-    print('[#] Using existing BLAST output \'{}\''.format(fw_fn))
-top_forward = get_top_hits(
-    fw_fn, PARALOGS, query_match=qm_q, seq_lengths=s_lengths)
-if PARALOGS:
-    # don't need to run BLAST again; process the same file
-    top_reverse = get_top_hits(
-        fw_fn, PARALOGS, query_match=s_lengths)
-else:
-    if not os.path.isfile(rv_fn) or OVERWRITE:
-        reverse_args = [BLAST, SUBJECT, QUERY, BLAST_TYPE, '-n', rv_fn] + optional
-        subprocess.run(reverse_args)    
-    else:
-        print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
-    top_reverse = get_top_hits(
-        rv_fn, query_match=qm_s, seq_lengths=q_lengths)
+# get reciprologs for each pairwise combo of files
+pairwise_reciprolog_sets = []
+for q, s in combinations(INPUT_FILES, 2):
+    reciprolog_set = pair_reciprologs(
+        q, s, BLAST_TYPE, QUERY_PERCENTAGE, optional)
+    pairwise_reciprolog_sets.append(reciprolog_set)
 
-# Filter for reciprocal best hits
-reciprologs = get_reciprocals(top_forward, top_reverse)
+reciprologs = aggregate_orthos(pairwise_reciprolog_sets)
 
-out_file = "{}-{}.{}.reciprologs".format(
-    abbreviate(QUERY), abbreviate(SUBJECT), BLAST_TYPE)
+basename = '-'.join([abbreviate(f) for f in INPUT_FILES])
+out_file = '{}.{}.reciprologs'.format(basename, BLAST_TYPE)
+
 with open(out_file, 'w') as out:
-    for pair in reciprologs:
-        out.write("\t".join(pair) + "\n")
+    for group in reciprologs:
+        out.write('\t'.join(group) + '\n')
 
 runtime = get_runtime(t_start)
 
 print(
     '[#] Job finished in {}; {} pairs found: '
     '\'{}\''.format(runtime, len(reciprologs), out_file),
-      file=sys.stderr)
+    file=sys.stderr)
 
 sys.exit(0)
