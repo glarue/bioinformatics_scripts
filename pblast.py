@@ -101,9 +101,18 @@ def get_runtime(start_time, p=3):
 
 
 def abbreviate(name, delimiter="."):
-    name = name.split("/")[-1]  # in case of non-local file path
+    name = os.path.basename(name)  # in case of non-local file path
     abbreviation = name.split(delimiter)[0]
+
     return abbreviation
+
+
+def unique_filenames(*file_list):
+    abbreviated = [abbreviate(f) for f in file_list]
+    if len(set(abbreviated)) < len(abbreviated):  # not all are unique
+        return [os.path.basename(f) for f in file_list]
+    else:
+        return abbreviated
 
 
 def db_check(db_filename):
@@ -461,9 +470,10 @@ SUBJECT = run_files['subject']
 QUERY = run_files['query']
 
 if not OUT_NAME:
+    subj, quer = unique_filenames(SUBJECT, QUERY)
     OUT_NAME = '{}-{}.{}.blast_results'.format(
-        abbreviate(QUERY), 
-        abbreviate(SUBJECT),
+        quer, 
+        subj,
         BLAST_TYPE)
 
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE, overwrite=OVERWRITE)
