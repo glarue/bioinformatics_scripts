@@ -3,13 +3,13 @@
 """
 usage: reciprologs.py [-h] [-p [PARALLEL_PROCESSES]]
                       [-t QUERY_PERCENTAGE_THRESHOLD] [--overwrite]
-                      file_1 file_2 {blastn,blastp,blastx,tblastn,tblastx}
+                      input_files [input_files ...]
+                      {blastn,blastp,blastx,tblastn,tblastx}
 
-Uses BLAST to find reciprocal best hits between two files.
+Uses BLAST to find reciprocal best hits between two or more files.
 
 positional arguments:
-  file_1                file to BLAST
-  file_2                file to BLAST
+  input_files           files to use to build reciprolog sets
   {blastn,blastp,blastx,tblastn,tblastx}
                         type of BLAST program to run
 
