@@ -312,10 +312,7 @@ def aggregate_orthos(orthos):
 
 def pair_reciprologs(query, subject, blast_type, qp, extra):
     # special case of BLASTing against self
-    if query == subject:
-        PARALOGS = True
-    else:
-        PARALOGS = False
+    PARALOGS = query == subject
 
     q_lengths, s_lengths = {}, {}
     # we need to get sequence lengths for each file
