@@ -170,6 +170,14 @@ parser.add_argument(
     help='Keep SRA files after dumping to FASTQ format',
     action='store_true'
 )
+parser.add_argument(
+    '-t',
+    '--trinity_compatible_ids',
+    help=(
+        'rename read IDs in paired-end data to ensure '
+        'downstream compatibility with Trinity'),
+    action='store_true'
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -181,7 +189,6 @@ if args.file:
 else:
     accs = clean_args(args.accessions)
 
-
 if len(accs) > 25:
     choice = input(
         'Are you sure you want to run this on {} files? (y/n): '
@@ -189,10 +196,14 @@ if len(accs) > 25:
     if choice.lower() != 'y':
         sys.exit('Aborting run.')
 
+# rename ids using fastq-dump's built-in if desired
+if args.trinity_compatible_ids:
+    id_arg = ' --defline-seq \'@$ac.$si:$sn[_$rn]/$ri\''
+else:
+    id_arg = ''
 
 cmds = {
-    'paired': ('fastq-dump --defline-seq '
-    '\'@$ac.$si:$sn[_$rn]/$ri\' --split-files '),
+    'paired': ('fastq-dump{} --split-files '.format(id_arg)),
     'single': 'fastq-dump '
 }
 
@@ -213,9 +224,6 @@ for acc in accs:
     if not args.keep_sra_files:
         os.remove(acc_filename)
 
-# if not args.keep_sra_files:
-#     for sra in sra_files:
-#         os.remove(sra)
 
 print('[#] All commands finished. Exiting now.', file=sys.stderr)
 
