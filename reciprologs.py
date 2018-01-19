@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 """
-usage: reciprologs.py [-h] [-p [PARALLEL_PROCESSES]]
-                      [-t QUERY_PERCENTAGE_THRESHOLD] [--overwrite]
-                      [--one_to_one] [--logging]
-                      input_files [input_files ...]
+usage: reciprologs.py [-h] [-p [PARALLEL_PROCESSES]] [-t PERCENTAGE]
+                      [--overwrite] [--one_to_one] [--logging]
+                      file_1 file_2 ... [file_1 file_2 ... ...]
                       {blastn,blastp,blastx,tblastn,tblastx}
 
 Uses BLAST to find reciprocal best hits between two or more files.
 
 positional arguments:
-  input_files           files to use to build reciprolog sets
+  file_1 file_2 ...     files to use to build reciprolog sets (space
+                        separated)
   {blastn,blastp,blastx,tblastn,tblastx}
                         type of BLAST program to run
 
@@ -20,7 +20,7 @@ optional arguments:
                         run the BLAST step using multiple parallel processes;
                         without specific input will use half available system
                         CPUs (default: None)
-  -t QUERY_PERCENTAGE_THRESHOLD, --query_percentage_threshold QUERY_PERCENTAGE_THRESHOLD
+  -t PERCENTAGE, --query_percentage_threshold PERCENTAGE
                         require a specified fraction of the query length to
                         match in order for a hit to qualify (lowest allowable
                         percentage (default: None)
