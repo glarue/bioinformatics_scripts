@@ -3,6 +3,7 @@
 """
 usage: reciprologs.py [-h] [-p [PARALLEL_PROCESSES]]
                       [-t QUERY_PERCENTAGE_THRESHOLD] [--overwrite]
+                      [--one_to_one] [--logging]
                       input_files [input_files ...]
                       {blastn,blastp,blastx,tblastn,tblastx}
 
@@ -25,6 +26,12 @@ optional arguments:
                         percentage (default: None)
   --overwrite           overwrite existing BLAST files (instead of using to
                         bypass BLAST) (default: False)
+  --one_to_one          remove any many-to-one reciprolog relationships in
+                        each pairwise set, such that each member of each
+                        pairwise comparison is only present exactly one time
+                        in output (default: False)
+  --logging             output a log of BLAST best-hit choice criteria
+                        (default: False)
 
 NOTE: Depends on pblast.py
 
@@ -426,7 +433,8 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     'input_files',
-    help='files to use to build reciprolog sets',
+    metavar='file_1 file_2 ...',
+    help='files to use to build reciprolog sets (space separated)',
     nargs='+'
 )
 parser.add_argument(
@@ -452,6 +460,7 @@ parser.add_argument(
 parser.add_argument(
     '-t',
     '--query_percentage_threshold',
+    metavar='PERCENTAGE',
     help=(
         'require a specified fraction of the query length to match in '
         'order for a hit to qualify (lowest allowable percentage'),
@@ -468,7 +477,7 @@ parser.add_argument(
     help=(
         'remove any many-to-one reciprolog relationships in each pairwise '
         'set, such that each member of each pairwise comparison is only '
-        'present exactly one time per set'),
+        'present exactly one time in output'),
     action='store_true'
 )
 parser.add_argument(
@@ -542,7 +551,7 @@ with open(out_file, 'w') as out:
 runtime = get_runtime(t_start)
 
 print(
-    '[#] Job finished in {}; {} pairs found: '
+    '[#] Job finished in {}; {} reciprolog sets found: '
     '\'{}\''.format(runtime, len(reciprologs), out_file),
     file=sys.stderr)
 
