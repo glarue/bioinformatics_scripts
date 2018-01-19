@@ -128,6 +128,8 @@ def parse_blast_line(bl, *args):
 
 def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
     results = {}
+    # dictionary to store tie-broken matches
+    win_ledger = defaultdict(lambda: defaultdict(set))
     with open(blast) as blst:
         for l in blst:
             new_best_hit = False
@@ -148,34 +150,43 @@ def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
                     continue
             if q in results:
                 # Check if this hit's score is better
-                defender_score = results[q]["score"]
+                defender_score = results[q]['score']
+                defender_name = results[q]['name']
                 if score > defender_score:
                     new_best_hit = True
+                    loser_info = (defender_name, 'bitscore')
+                    win_ledger[q]['losers'].add(loser_info)
                     # results[q] = {"name": s, "score": score}
                 # if scores are equal, check if sequence lenths
                 # have been provided as an additional tiebreaking
                 # criteria and look up the subject length to
                 # see if there's a difference
                 elif score == defender_score and seq_lengths is not None:
-                    defender_name = results[q]['name']
                     defender_length = seq_lengths[defender_name]
                     current_length = seq_lengths[s]
                     if current_length > defender_length:
+                        loser_info = (defender_name, 'length')
+                        win_ledger[q]['losers'].add(loser_info)
                         new_best_hit = True
+     
+                if new_best_hit is True:
+                    win_ledger[q]['best'] = s
+                    
             else:
                 new_best_hit = True
 
             if new_best_hit is True:
                 results[q] = {"name": s, "score": score}
 
-    return results
+    return results, win_ledger
 
 
 def get_reciprocals(d1, d2):
     """
     Takes two dictionaries of top BLAST hits,
     returns a list of tuples of all pairs that were
-    reciprocal best hits.
+    reciprocal best hits, along with their bitscore
+    values.
 
     """
     reciprologs = set()
@@ -183,10 +194,14 @@ def get_reciprocals(d1, d2):
     for first, second in [(d1, d2), (d2, d1)]:
         for query, hit_info in first.items():
             best_hit = hit_info["name"]
+            score = hit_info["score"]
             if best_hit in second:
                 reciprocal_hit = second[best_hit]["name"]
                 if query == reciprocal_hit:  # best hit refers back to query
+                    r_score = second[best_hit]["score"]
                     hit_pair = sorted([query, best_hit])
+                    score_tuple = tuple(sorted([score, r_score]))
+                    hit_pair.append(score_tuple)
                     reciprologs.add(tuple(hit_pair))
     return sorted(reciprologs)
 
@@ -343,25 +358,31 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
         subprocess.run(forward_args)
     else:
         print('[#] Using existing BLAST output \'{}\''.format(fw_fn))
-    top_forward = get_top_hits(
+    top_forward, fw_win_ledger = get_top_hits(
         fw_fn, PARALOGS, query_match=qm_q, seq_lengths=s_lengths)
     if PARALOGS:
-        # don't need to run BLAST again; process the same file
-        top_reverse = get_top_hits(
-            fw_fn, PARALOGS, query_match=s_lengths)
+        top_reverse = top_forward
+        rv_win_ledger = defaultdict(list)
+        ## don't need to run BLAST again; process the same file
+        # top_reverse, rv_win_ledger = get_top_hits(
+        #     fw_fn, PARALOGS, query_match=qm_q)
     else:
         if not os.path.isfile(rv_fn) or OVERWRITE:
             reverse_args = [BLAST, subject, query, blast_type, '-n', rv_fn] + extra
             subprocess.run(reverse_args)    
         else:
             print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
-        top_reverse = get_top_hits(
+        top_reverse, rv_win_ledger = get_top_hits(
             rv_fn, query_match=qm_s, seq_lengths=q_lengths)
 
     # Filter for reciprocal best hits
     reciprocal_hits = get_reciprocals(top_forward, top_reverse)
 
-    return reciprocal_hits
+    # combine winners ledger
+
+    win_ledger = {**fw_win_ledger, **rv_win_ledger}
+
+    return reciprocal_hits, win_ledger
 
 
 parser = argparse.ArgumentParser(
@@ -409,6 +430,19 @@ parser.add_argument(
     help='overwrite existing BLAST files (instead of using to bypass BLAST)',
     action='store_true'
 )
+parser.add_argument(
+    '--one_to_one',
+    help=(
+        'remove any many-to-one reciprolog relationships in each pairwise '
+        'set, such that each member of each pairwise comparison is only '
+        'present exactly one time per set'),
+    action='store_true'
+)
+parser.add_argument(
+    '--logging',
+    help='output a log of BLAST best-hit choice criteria',
+    action='store_true'
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -426,6 +460,7 @@ if len(INPUT_FILES) < 2:
     sys.exit('error: too few files specified (need >1)')
 QUERY_PERCENTAGE = args.query_percentage_threshold
 OVERWRITE = args.overwrite
+LOGGING = args.logging
 
 BLAST = 'pblast.py'
 
@@ -442,8 +477,21 @@ for k, v in call_options.items():
 # get reciprologs for each pairwise combo of files
 pairwise_reciprolog_sets = []
 for q, s in combinations(INPUT_FILES, 2):
-    reciprolog_set = pair_reciprologs(
+    reciprolog_set, win_ledger = pair_reciprologs(
         q, s, BLAST_TYPE, QUERY_PERCENTAGE, optional)
+    if LOGGING:
+        ledger_file = '{}-{}.{}.log'.format(
+            abbreviate(q), abbreviate(s), BLAST_TYPE)
+        with open(ledger_file, 'w') as lf:
+            for query, info in sorted(win_ledger.items()):
+                winner = info['best']
+                loser_tuples = info['losers']
+                lf.write('>{}\t({})\n'.format(winner, query))
+                for loser in sorted(loser_tuples):
+                    lf.write('\t'.join(loser) + '\n')
+    # remove score info
+    reciprolog_set = [tuple(x[0:2]) for x in reciprolog_set]
+
     pairwise_reciprolog_sets.append(reciprolog_set)
 
 reciprologs = aggregate_orthos(pairwise_reciprolog_sets)
