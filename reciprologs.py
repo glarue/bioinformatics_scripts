@@ -384,6 +384,39 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
 
     return reciprocal_hits, win_ledger
 
+def remove_many_to_one(pairs):
+    """
+    Each element of >pairs< is a tuple: (hitA, hitB, (scoreX, scoreY))
+
+    Takes a list of paired reciprocal hits (plus scores) and filters it
+    such that each member of each pair only occur once, i.e. it removes
+    any many-to-one hits, using the bitscores in the last element of
+    each tuple.
+    
+    """
+    uniques = {}
+    to_remove = []
+    for index, (a, b, scores) in enumerate(pairs):
+        avg_score = sum(scores) / 2
+        for e in [a, b]:
+            if e not in uniques:
+                uniques[e] = {'score': avg_score, 'index': index}
+            elif uniques[e]['score'] >= avg_score:
+                to_remove.append(index)
+                continue
+            else:
+                to_remove.append(uniques[e]['index'])
+                uniques[e] = {'score': avg_score, 'index': index}
+
+    filtered = []
+    for i, p in enumerate(pairs):
+        if i in to_remove:
+            names = p[0:2]
+            print('Removed: {}'.format('\t'.join(names)), file=sys.stderr)
+        else:
+            filtered.append(p)
+
+    return filtered
 
 parser = argparse.ArgumentParser(
     description=(
@@ -460,6 +493,7 @@ if len(INPUT_FILES) < 2:
     sys.exit('error: too few files specified (need >1)')
 QUERY_PERCENTAGE = args.query_percentage_threshold
 OVERWRITE = args.overwrite
+ONE_TO_ONE = args.one_to_one
 LOGGING = args.logging
 
 BLAST = 'pblast.py'
@@ -489,6 +523,8 @@ for q, s in combinations(INPUT_FILES, 2):
                 lf.write('>{}\t({})\n'.format(winner, query))
                 for loser in sorted(loser_tuples):
                     lf.write('\t'.join(loser) + '\n')
+    if ONE_TO_ONE is True:
+        reciprolog_set = remove_many_to_one(reciprolog_set)
     # remove score info
     reciprolog_set = [tuple(x[0:2]) for x in reciprolog_set]
 
