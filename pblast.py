@@ -182,7 +182,8 @@ def local_blast(
     db_abbrev = abbreviate(db_file)
     query_abbrev = abbreviate(query_file)
     if filename is None:
-        filename = "{}-{}.blast_results".format(query_abbrev, db_abbrev)
+        filename = "{}-vs-{}.{}.blast".format(
+            query_abbrev, db_abbrev, blast_type)
     cmd_args = [
         blast_type,
         "-db",
@@ -347,7 +348,7 @@ def parallel_blast(
     print('[#] Query split into {} files:\n{}\n'
           .format(len(chunked), chunk_list))
     if out_name is None:
-        out_name = '{}-{}.{}.blast_results'.format(
+        out_name = '{}-vs-{}.{}.blast'.format(
             abbreviate(query), abbreviate(subject), blast_type)
     filenames = [
         '{0}.{1:0{2}}.tmp'.format(out_name, i, zero_pad) 
@@ -471,7 +472,7 @@ QUERY = run_files['query']
 
 if not OUT_NAME:
     subj, quer = unique_filenames(SUBJECT, QUERY)
-    OUT_NAME = '{}-{}.{}.blast_results'.format(
+    OUT_NAME = '{}-vs-{}.{}.blast'.format(
         quer, 
         subj,
         BLAST_TYPE)
