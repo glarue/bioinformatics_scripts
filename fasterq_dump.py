@@ -220,7 +220,7 @@ else:
 
 cmds = {
     'paired': ('fastq-dump{} --split-files '.format(id_arg)),
-    'single': 'fastq-dump '
+    'single': 'fastq-dump{} '.format(id_arg)
 }
 
 sra_files = []
