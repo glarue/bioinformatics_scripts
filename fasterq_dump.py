@@ -91,14 +91,23 @@ def paired_check(acc):
     return read_type
 
 
-def fetch_sra(acc):
+def fetch_sra(acc, overwrite=False):
     """
     Grabs an SRA file from NCBI.
     
     """
+    sra_filename = '{}.sra'.format(acc)
+
+    # if local file already exists, use it instead
+    if os.path.isfile(sra_filename) and overwrite is False:
+        print(
+            '[#] Using existing SRA file: {}'.format(sra_filename),
+            file=sys.stderr
+        )
+        return sra_filename
+    
     alpha = acc[:3]
     first_six = acc[:6]
-    sra_filename = '{}.sra'.format(acc)
 
     # build file path to SRA data
     base_path = 'ftp://ftp-trace.ncbi.nlm.nih.gov'
@@ -178,6 +187,13 @@ parser.add_argument(
         'downstream compatibility with Trinity'),
     action='store_true'
 )
+parser.add_argument(
+    '-w',
+    '--overwrite',
+    help=(
+        'overwrite any matching local SRA files'),
+    action='store_true'
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -222,7 +238,8 @@ for acc in accs:
     # allow time for fastq-dump to print to stdout
     time.sleep(2)
     if not args.keep_sra_files:
-        os.remove(acc_filename)
+        if os.path.isfile(acc_filename):
+            os.remove(acc_filename)
 
 
 print('[#] All commands finished. Exiting now.', file=sys.stderr)
