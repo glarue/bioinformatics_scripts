@@ -198,7 +198,7 @@ parser.add_argument(
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
-args = parser.parse_args()
+args, extra_args = parser.parse_known_args()
 
 if args.file:
     accs = acc_list_from_file(args.file)
@@ -225,13 +225,20 @@ cmds = {
 
 sra_files = []
 
+extra_arg_string = ' '.join(extra_args)
+
 for acc in accs:
-    acc_filename = fetch_sra(acc)
-    read_type = paired_check(acc_filename)    
+    if '-X' not in extra_args:
+        acc_filename = fetch_sra(acc, args.overwrite)
+        sra_files.append(acc_filename)
+    else:
+        # we don't want to pre-fetch SRA since we're 
+        # only getting a subset of the reads
+        acc_filename = acc
+    read_type = paired_check(acc)
     print('[#] Detected read type for {}: {}'.format(acc, read_type), 
           file=sys.stderr)
-    sra_files.append(acc_filename)
-    cmd = cmds[read_type] + acc_filename
+    cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
     dump_args = shlex.split(cmd)
     print('[#] Running command \'{}\''.format(cmd), file=sys.stderr)
     subprocess.run(dump_args)
