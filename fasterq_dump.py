@@ -166,7 +166,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     'accessions',
     nargs='*',
-    help='List of SRA accession numbers (e.g. SRR123456 SRR123457)'
+    help='Space-separated list of SRA accession numbers (e.g. SRR123456 SRR123457)'
 )
 parser.add_argument(
     '-f',
