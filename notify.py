@@ -36,6 +36,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+
 def get_runtime(start_time, p=3):
     """
     Takes a start time and optional decimal precision p,
@@ -369,7 +370,7 @@ config_info = get_config_info(CONFIG)
 
 CMDS = args.commands
 
-#assume first argument is external program name
+# assume first argument is external program name
 REF_NAME = CMDS[0]
 
 CMD_STRING = ' '.join(CMDS)
