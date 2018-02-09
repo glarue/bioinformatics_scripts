@@ -41,6 +41,7 @@ import subprocess
 import os
 import time
 import argparse
+import re
 from operator import itemgetter
 from multiprocessing import cpu_count
 from collections import defaultdict
@@ -133,6 +134,44 @@ def parse_blast_line(bl, *args):
     return results
 
 
+def is_better(challenger, defender, seq_lengths=None):
+    """
+    Compares attributes of two dictionaries of BLAST
+    hits for a given query to determine which is better.
+
+    Returns the winning dictionary and reason if it's 
+    better, otherwise False.
+    
+    """
+    cbs = challenger['score']
+    dbs = defender['score']
+    # criteria: bitscore
+    if cbs < dbs:
+        return False
+    elif cbs > dbs:
+        return challenger, 'bitscore'
+    elif cbs == dbs:
+        # criteria --> e-value
+        cev = challenger['evalue']
+        dev = defender['evalue']
+        if cev < dev: # lower is better
+            return challenger, 'e-value'
+        elif seq_lengths is not None:
+            # criteria --> length
+            # if scores are equal, check if sequence lenths
+            # have been provided as an additional tiebreaking
+            # criteria and look up the subject length to
+            # see if there's a difference
+            dn = defender['name']
+            cn = challenger['name']
+            if seq_lengths[cn] > seq_lengths[dn]:
+                return challenger, 'length'
+        else:
+            return False
+    else:
+        return False
+
+
 def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
     results = {}
     # dictionary to store tie-broken matches
@@ -142,8 +181,13 @@ def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
             new_best_hit = False
             if l.startswith("#"):
                 continue
-            (q, s, score, length) = parse_blast_line(
-                l, "query", "subject", "bitscore", "length")
+            (q, s, score, length, evalue) = parse_blast_line(
+                l, "query", "subject", "bitscore", "length", "e")
+            challenger = {
+                'name': s,
+                'score': score,
+                'evalue': evalue
+            }
             # do not consider hits to self if BLASTing against self,
             # but allow query/subject names to be the same
             if paralogs and q == s:
@@ -156,36 +200,91 @@ def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
                 if fraction < query_match['query_match_threshold']:
                     continue
             if q in results:
-                # Check if this hit's score is better
-                defender_score = results[q]['score']
-                defender_name = results[q]['name']
-                if score > defender_score:
+                defender = results[q]
+                challenger_wins = is_better(
+                    challenger, defender, seq_lengths)
+                if challenger_wins:  # new hit is better
                     new_best_hit = True
-                    loser_info = (defender_name, 'bitscore')
+                    defender_name = results[q]['name']
+                    reason = challenger_wins[1]
+                    loser_info = (defender_name, reason)
                     win_ledger[q]['losers'].add(loser_info)
-                    # results[q] = {"name": s, "score": score}
-                # if scores are equal, check if sequence lenths
-                # have been provided as an additional tiebreaking
-                # criteria and look up the subject length to
-                # see if there's a difference
-                elif score == defender_score and seq_lengths is not None:
-                    defender_length = seq_lengths[defender_name]
-                    current_length = seq_lengths[s]
-                    if current_length > defender_length:
-                        loser_info = (defender_name, 'length')
-                        win_ledger[q]['losers'].add(loser_info)
-                        new_best_hit = True
-     
-                if new_best_hit is True:
                     win_ledger[q]['best'] = s
                     
             else:
                 new_best_hit = True
 
             if new_best_hit is True:
-                results[q] = {"name": s, "score": score}
+                results[q] = {"name": s, "score": score, "evalue": evalue}
 
     return results, win_ledger
+
+# def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
+#     results = {}
+#     # dictionary to store tie-broken matches
+#     win_ledger = defaultdict(lambda: defaultdict(set))
+#     with open(blast) as blst:
+#         for l in blst:
+#             new_best_hit = False
+#             if l.startswith("#"):
+#                 continue
+#             (q, s, score, length, evalue) = parse_blast_line(
+#                 l, "query", "subject", "bitscore", "length", "e")
+#             current = {
+#                 'query': q,
+#                 'name': s,
+#                 'score': score,
+#                 'length': length,
+#                 'evalue': evalue
+#             }
+#             # do not consider hits to self if BLASTing against self,
+#             # but allow query/subject names to be the same
+#             if paralogs and q == s:
+#                 continue
+#             if query_match:
+#                 # use query_match dictionary to compare query lengths to
+#                 # match lengths to exclude matches where query percentage 
+#                 # is below query_match_threshold key
+#                 fraction = (length / query_match[q]) * 100
+#                 if fraction < query_match['query_match_threshold']:
+#                     continue
+#             if q in results:
+#                 #TODO refactor this decision tree into a function
+#                 # Check if this hit's score is better
+#                 defender_score = results[q]['score']
+#                 defender_name = results[q]['name']
+#                 if score > defender_score:
+#                     new_best_hit = True
+#                     loser_info = (defender_name, 'bitscore')
+#                     win_ledger[q]['losers'].add(loser_info)
+#                 elif score == defender_score:
+#                     defender_evalue = results[q]['evalue']   
+#                     if evalue < defender_evalue: # smaller is better
+#                         new_best_hit = True
+#                         loser_info = (defender_name, 'evalue')
+#                         win_ledger[q]['losers'].add(loser_info)
+#                     elif seq_lengths is not None:
+#                         # if scores are equal, check if sequence lenths
+#                         # have been provided as an additional tiebreaking
+#                         # criteria and look up the subject length to
+#                         # see if there's a difference
+#                         defender_length = seq_lengths[defender_name]
+#                         current_length = seq_lengths[s]
+#                         if current_length > defender_length:
+#                             loser_info = (defender_name, 'length')
+#                             win_ledger[q]['losers'].add(loser_info)
+#                             new_best_hit = True
+     
+#                 if new_best_hit is True:
+#                     win_ledger[q]['best'] = s
+                    
+#             else:
+#                 new_best_hit = True
+
+#             if new_best_hit is True:
+#                 results[q] = {"name": s, "score": score, "evalue": evalue}
+
+#     return results, win_ledger
 
 
 def get_reciprocals(d1, d2):
@@ -269,7 +368,7 @@ def make_ortho_dict(*orthos):
     return collector
 
 
-def aggregate_dict(ortho_dict):
+def aggregate_dict_chained(ortho_dict):
     """
     IN:
     defaultdict(set,
@@ -305,11 +404,11 @@ def aggregate_dict(ortho_dict):
             changed = True
             master[k].update(ortho_dict[v2])
     if changed is True:
-        master = aggregate_dict(master)
+        master = aggregate_dict_chained(master)
     return master
 
 
-def aggregate_orthos(orthos):
+def aggregate_orthos_chained(orthos):
     """
     IN:
     [
@@ -323,13 +422,84 @@ def aggregate_orthos(orthos):
     
     """
     o_dict = make_ortho_dict(*orthos)
-    aggregated = aggregate_dict(o_dict)
+    aggregated = aggregate_dict_chained(o_dict)
     ortho_groups = []
     for k, v in aggregated.items():
         combined = tuple(v) + (k,)
         ortho_groups.append(sorted(combined))
     
     return sorted(ortho_groups)
+
+
+def every_member_match(members, m_dict):
+    all_match = True
+    for m in members:
+        others = [e for e in members if e != m]
+        if not others:
+            return True
+        for o in others:
+            if m not in m_dict[o]:
+                return False
+            
+    return all_match
+
+    
+def all_by_all_orthos(ortho_dict):
+    full_groups = {}
+    for k, v in ortho_dict.items():
+        groups = []
+        max_n = len(v)
+        # special case where there is only one element to compare against
+        if max_n == 1:
+            if every_member_match(v, ortho_dict):
+                groups.append(tuple(v))
+        for i in range(2, max_n + 1):
+            for g in combinations(v, i):
+                if every_member_match(g, ortho_dict):
+                    groups.append(g)
+        full_groups[k] = groups
+        
+    all_sets = set()
+    for k, group_list in full_groups.items():
+        for g in group_list:
+            full_group = sorted(set(list(g) + [k]))
+            all_sets.add(tuple(full_group))
+    
+    return sorted(all_sets)
+
+
+def aggregate_orthos_strict(orthos):
+    """
+    IN:
+    [
+        [('a', 'b'), ('a', 'c'), ('a', 'd')],
+        [('b', 'c'), ('b', 'e'), ('b', 'f')],
+        [('c', 'e'), ('c', 'f'), ('c', 'g')],
+        [('z', 'x'), ('z', 'y'), ('z', 'w')]
+    ]
+    OUT:
+    [
+        ('a', 'b', 'c'), 
+        ('a', 'd'), 
+        ('b', 'c', 'e'), 
+        ('b', 'c', 'f'), 
+        ('c', 'g'), 
+        ('w', 'z'), 
+        ('x', 'z'), 
+        ('y', 'z')
+    ]
+    
+    """
+    o_dict = make_ortho_dict(*orthos)
+    aggregated = all_by_all_orthos(o_dict)
+    
+    return aggregated
+
+def names_from_blastfile(blast_fn):
+    file_pattern = r'(.+)-vs-(.+)\.\w+\.blast'
+    query_fn, subject_fn = re.findall(file_pattern, blast_fn)[0]
+
+    return query_fn, subject_fn
 
 
 def pair_reciprologs(query, subject, blast_type, qp, extra):
@@ -356,8 +526,8 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
     fw_names = unique_filenames(query, subject)
     rv_names = fw_names[::-1]
 
-    fw_fn = '{}-{}.{}.blast_results'.format(*fw_names, blast_type)
-    rv_fn = '{}-{}.{}.blast_results'.format(*rv_names, blast_type)
+    fw_fn = '{}-vs-{}.{}.blast'.format(*fw_names, blast_type)
+    rv_fn = '{}-vs-{}.{}.blast'.format(*rv_names, blast_type)
 
     # use existing BLAST output unless --overwrite is specified
     if not os.path.isfile(fw_fn) or OVERWRITE:
@@ -529,7 +699,7 @@ for q, s in combinations(INPUT_FILES, 2):
             for query, info in sorted(win_ledger.items()):
                 winner = info['best']
                 loser_tuples = info['losers']
-                lf.write('>{}\t({})\n'.format(winner, query))
+                lf.write('>{}\t[{}]\n'.format(winner, query))
                 for loser in sorted(loser_tuples):
                     lf.write('\t'.join(loser) + '\n')
     if ONE_TO_ONE is True:
@@ -539,7 +709,9 @@ for q, s in combinations(INPUT_FILES, 2):
 
     pairwise_reciprolog_sets.append(reciprolog_set)
 
-reciprologs = aggregate_orthos(pairwise_reciprolog_sets)
+
+# reciprologs = aggregate_orthos_chained(pairwise_reciprolog_sets)
+reciprologs = aggregate_orthos_strict(pairwise_reciprolog_sets)
 
 basename = '-'.join([abbreviate(f) for f in INPUT_FILES])
 out_file = '{}.{}.reciprologs'.format(basename, BLAST_TYPE)
