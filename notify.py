@@ -386,7 +386,7 @@ result = return_code
 
 # Get machine hostname and time
 host = subprocess.check_output(["hostname"])
-tstring = "%Y.%m.%d-%H.%M"
+tstring = "%m-%d-%y@%H:%M"
 sys_time = '[{}]'.format(time.strftime(tstring))
 
 # format the email subject line depending on provided info 
@@ -400,10 +400,10 @@ if args.ID:
 else:
     id_string = ''
 
-host_prefix = '{}{}{}'.format(sys_time, host, id_string)
+host_prefix = '{}{}'.format(host, id_string)
 
 # Message subject line
-msg_subject = "{}: '{}' completed".format(host_prefix, REF_NAME)
+msg_subject = "{}: '{}' completed ({})".format(host_prefix, REF_NAME, sys_time)
 
 # Completion message
 msg_body = "\n".join([
