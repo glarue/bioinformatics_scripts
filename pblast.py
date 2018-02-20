@@ -348,7 +348,7 @@ def parallel_blast(
     print('[#] Query split into {} files:\n{}\n'
           .format(len(chunked), chunk_list))
     if out_name is None:
-        out_name = '{}-vs-{}.{}.blast'.format(
+        out_name = '{}-vs-{}.{}'.format(
             abbreviate(query), abbreviate(subject), blast_type)
     filenames = [
         '{0}.{1:0{2}}.tmp'.format(out_name, i, zero_pad) 
@@ -472,7 +472,7 @@ QUERY = run_files['query']
 
 if not OUT_NAME:
     subj, quer = unique_filenames(SUBJECT, QUERY)
-    OUT_NAME = '{}-vs-{}.{}.blast'.format(
+    OUT_NAME = '{}-vs-{}.{}'.format(
         quer, 
         subj,
         BLAST_TYPE)
