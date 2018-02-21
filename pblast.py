@@ -192,6 +192,8 @@ def local_blast(
         query_file,
         "-evalue",
         e_value,
+        "-num_threads",
+        threads,
         "-outfmt",
         out_fmt,
         "-out",
@@ -311,8 +313,9 @@ def parallel_blast(
         subject, 
         query, 
         blast_type,
-        out_fmt=6, 
-        e_value=1e-10, 
+        out_fmt=6,
+        e_value=1e-10,
+        threads=1,
         out_name=None,
         extra_blast_args=None):
     pool = Pool(PARALLEL)
@@ -320,6 +323,7 @@ def parallel_blast(
         local_blast, 
         subject, 
         blast_type,
+        threads=threads,
         out_fmt=out_fmt,
         e_value=e_value, 
         extra_blast_args=extra_blast_args)
@@ -408,8 +412,9 @@ parser.add_argument(
 parser.add_argument(
     '-p',
     '--parallel_processes',
-    help=('run the BLAST step using multiple parallel processes; '
-          'without specific input will use half of available system CPUs'),
+    help=(
+        'run the BLAST step using multiple parallel processes; '
+        'without specific input will use half of available system CPUs'),
     type=int,
     const=round(cpu_count() / 2),
     nargs='?',
@@ -422,17 +427,26 @@ parser.add_argument(
     action='store_true'
 )
 parser.add_argument(
-    '-o',
+    '-f',
     '--output_format',
     type=int,
     help='integer output format for BLAST results',
     default=6
 )
 parser.add_argument(
-    '-n',
-    '--name',
+    '-o',
+    '--output_name',
     type=str,
     help='filename for results (otherwise, automatic based on input)'
+)
+parser.add_argument(
+    '-t',
+    '--threads',
+    type=int,
+    default=1,
+    help=(
+        'number of threads per process. Be careful when combining this '
+        'with multiple processes!')
 )
 parser.add_argument(
     '-e',
@@ -456,7 +470,8 @@ BLAST_TYPE = args.blast_type
 # THREADS = args.threads
 PARALLEL = args.parallel_processes
 SINGLE = args.single
-OUT_NAME = args.name
+OUT_NAME = args.output_name
+THREADS = args.threads
 E_VALUE = args.e_value
 OUT_FORMAT = args.output_format
 OVERWRITE = args.clobber_db
@@ -485,6 +500,7 @@ if not SINGLE and PARALLEL > 1: #PARALLEL:
         SUBJECT, 
         QUERY, 
         BLAST_TYPE,
+        threads=THREADS,
         out_fmt=OUT_FORMAT,
         e_value=E_VALUE, 
         out_name=OUT_NAME,
@@ -495,9 +511,12 @@ else:
         SUBJECT, 
         BLAST_TYPE, 
         QUERY,
+        threads=THREADS,
         out_fmt=OUT_FORMAT,
         filename=OUT_NAME, 
         e_value=E_VALUE,
         extra_blast_args=EXTRA_ARGS)
+
+print('[#] BLAST results written to \'{}\''.format(OUT_NAME))
 
 sys.exit(0)
