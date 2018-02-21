@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: pblast.py [-h] [-p [PARALLEL_PROCESSES]] [-s] [-o OUTPUT_FORMAT]
-                 [-n NAME] [-e E_VALUE] [--clobber_db]
+usage: pblast.py [-h] [-p [PARALLEL_PROCESSES]] [-s] [-f OUTPUT_FORMAT]
+                 [-o OUTPUT_NAME] [-t THREADS] [-e E_VALUE] [--clobber_db]
                  query subject {blastn,blastp,blastx,tblastn,tblastx}
 
 BLAST one file against another. Any arguments not listed here will be passed
@@ -19,17 +19,22 @@ optional arguments:
   -p [PARALLEL_PROCESSES], --parallel_processes [PARALLEL_PROCESSES]
                         run the BLAST step using multiple parallel processes;
                         without specific input will use half of available
-                        system CPUs
+                        system CPUs (default: 2)
   -s, --single          disable parallel processing (default: False)
-  -o OUTPUT_FORMAT, --output_format OUTPUT_FORMAT
+  -f OUTPUT_FORMAT, --output_format OUTPUT_FORMAT
                         integer output format for BLAST results (default: 6)
-  -n NAME, --name NAME  filename for results (otherwise, automatic based on
+  -o OUTPUT_NAME, --output_name OUTPUT_NAME
+                        filename for results (otherwise, automatic based on
                         input) (default: None)
+  -t THREADS, --threads THREADS
+                        number of threads per process. Be careful when
+                        combining this with multiple processes! (default: 1)
   -e E_VALUE, --e_value E_VALUE
                         e-value threshold to use for search (default: 1e-10)
   --clobber_db          create new database even if one already exists
                         (default: False)
 """
+
 import sys
 import subprocess
 import os
