@@ -531,7 +531,7 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
 
     # use existing BLAST output unless --overwrite is specified
     if not os.path.isfile(fw_fn) or OVERWRITE:
-        forward_args = [BLAST, query, subject, blast_type, '-n', fw_fn] + extra
+        forward_args = [BLAST, query, subject, blast_type, '-o', fw_fn] + extra
         subprocess.run(forward_args)
     else:
         print('[#] Using existing BLAST output \'{}\''.format(fw_fn))
@@ -545,7 +545,7 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
         #     fw_fn, PARALOGS, query_match=qm_q)
     else:
         if not os.path.isfile(rv_fn) or OVERWRITE:
-            reverse_args = [BLAST, subject, query, blast_type, '-n', rv_fn] + extra
+            reverse_args = [BLAST, subject, query, blast_type, '-o', rv_fn] + extra
             subprocess.run(reverse_args)    
         else:
             print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
