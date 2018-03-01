@@ -403,7 +403,7 @@ else:
 host_prefix = '{}{}'.format(host, id_string)
 
 # Message subject line
-msg_subject = "{}: '{}' completed ({})".format(host_prefix, REF_NAME, sys_time)
+msg_subject = "{}: '{}' completed {}".format(host_prefix, REF_NAME, sys_time)
 
 # Completion message
 msg_body = "\n".join([
@@ -424,6 +424,6 @@ send_args = {
 
 send_ssl_mail(**send_args)
 
-print('[#] Command completed in {}'.format(run_time), file=sys.stderr)
+print('[#] notify.py: command completed in {}'.format(run_time), file=sys.stderr)
 
 sys.exit(0)
