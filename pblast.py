@@ -122,13 +122,13 @@ def unique_filenames(*file_list):
 
 def db_check(db_filename):
     db_directory = os.path.dirname(os.path.abspath(db_filename))
+    db_name = os.path.basename(db_filename)
     db_dir_files = os.listdir(db_directory)
+    db_dir_files = [f for f in db_dir_files if f.startswith(db_name)]
     db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
-    db_files = [f.rsplit('.', 1) for f in db_dir_files]
     # get just the file endings
-    db_name = os.path.basename(db_filename)    
-    db_files = [f[1] for f in db_files if f[0] == db_name]
-    present_endings = [f[-2:] for f in db_files]
+    db_files = [f.split('.')[-1] for f in db_dir_files]
+    present_endings = set([f[-2:] for f in db_files])
     if all(dbe in present_endings for dbe in db_endings):
         previous_db = True
     else:
@@ -368,7 +368,7 @@ def parallel_blast(
     results = []
     for pair in zip(chunked, filenames):
         results.append(pool.apply_async(blast, args=pair))
-        time.sleep(.01)
+        time.sleep(.05)
     pool.close()
     pool.join()
     results = [r.get() for r in results]
@@ -392,7 +392,8 @@ def concatenate(outname, file_list, clean=True):
 parser = argparse.ArgumentParser(
     description=(
         'BLAST one file against another. '
-    'Any arguments not listed here will be passed to BLAST unmodified.'),
+        'Any arguments not listed here will '
+        'be passed to BLAST unmodified.'),
     formatter_class=argparse.ArgumentDefaultsHelpFormatter, 
     allow_abbrev=False)
 
