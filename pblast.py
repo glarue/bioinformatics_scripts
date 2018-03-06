@@ -470,6 +470,8 @@ parser.add_argument(
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
+main_start_time = time.time()
+
 args, EXTRA_ARGS = parser.parse_known_args()
 
 BLAST_TYPE = args.blast_type
@@ -500,6 +502,9 @@ if not OUT_NAME:
 
 SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE, overwrite=OVERWRITE)
 
+current_runtime = get_runtime(main_start_time)
+print('[#] Database prep finished in {}'.format(current_runtime))
+
 if not SINGLE and PARALLEL > 1: #PARALLEL:
     # run multiple processes, and then join the output afterward
     pblast_out = parallel_blast(
@@ -523,6 +528,8 @@ else:
         e_value=E_VALUE,
         extra_blast_args=EXTRA_ARGS)
 
-print('[#] BLAST results written to \'{}\''.format(OUT_NAME))
+current_runtime = get_runtime(main_start_time)
+print( '[#] BLAST run finished in {}'.format(current_runtime))
+print('[#] Results written to \'{}\''.format(OUT_NAME))
 
 sys.exit(0)
