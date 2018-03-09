@@ -386,7 +386,7 @@ def translate_seq(string, verbosity="single", phase=0):
         try:
             amino_acids.append(codonMap[c.upper()][v])
         except KeyError:
-            amino_acids.append(c.lower())
+            amino_acids.append('X')
     return joinChar.join(amino_acids)
 
 
