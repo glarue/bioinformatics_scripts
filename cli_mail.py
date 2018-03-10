@@ -74,6 +74,11 @@ def send_ssl_mail(
         print('[#] Server connection error - retrying', file=sys.stderr)
         time.sleep(10)
         server = smtplib.SMTP_SSL(server_address, port)
+    except:  # try less-secure SSL connection instead
+        server = smtplib.SMTP(server_address, port)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
     retries = 2
     success = False
     while retries > 0:  # in case server rejects attempt
@@ -145,48 +150,56 @@ parser.add_argument(
     help="The body of the email, wrapped in "
     "single quotes ('')")
 parser.add_argument(
-    '--ID',
+    "--ID",
     type=str,
-    help='Arbitrary string to include in email header',
-    default=''
+    help="Arbitrary string to include in host tag (if present)"
+)
+parser.add_argument(
+    "--no_host_tag",
+    action="store_true",
+    help="disable host tag (time/server string) in subject"
 )
 parser.add_argument(
     "--suffix_tag",
     action="store_true",
-    help="place time/server info tag at end of subject rather than beginning"
+    help="place host tag at end of subject rather than beginning"
 )
 
 if len(sys.argv) == 1:
     parser.print_help()
     sys.exit(1)
 
-# Get machine hostname and time
-host = subprocess.check_output(["hostname"])
-
 args = parser.parse_args()
 
-# get system time as string
-tstring = "%m-%d-%y@%H:%M"
-sys_time = '[{}]'.format(time.strftime(tstring))
+if not args.no_host_tag:
+    # Get machine hostname and time
+    host = subprocess.check_output(["hostname"])
 
-if not host:
-    host = ""
+    # get system time as string
+    tstring = "%m-%d-%y@%H:%M"
+    sys_time = '[{}]'.format(time.strftime(tstring))
+
+    if not host:
+        host = None
+    else:
+        host = "[{}]".format(host.decode("utf-8").strip())
+
+    host_prefix = ''.join([e for e in [sys_time, host, args.ID] if e])
 else:
-    host = "[{}]".format(host.decode("utf-8").strip())
-
-host_prefix = '{}{}{}'.format(sys_time, host, args.ID)
+    host_prefix = ""
 
 if args.subject:
-    subject_bits = [host_prefix, args.subject]
+    subject_bits = [e for e in [host_prefix, args.subject] if e]
     if args.suffix_tag:
         subject_bits.reverse()
-    args.subject = "{} {}".format(*subject_bits)
+    args.subject = " ".join(subject_bits)
 else:
     args.subject = host_prefix
 
 arg_dict = vars(args)  # make a dictionary of args to use in function call
 del arg_dict['ID']
 del arg_dict['suffix_tag']
+del arg_dict['no_host_tag']
 send_ssl_mail(**arg_dict)  # unpack dictionary to kwargs
 
 sys.exit(0)
