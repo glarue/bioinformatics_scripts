@@ -3,7 +3,7 @@
 """
 usage: cli_mail.py [-h] -sadd SERVER_ADDRESS -fadd FROM_ADDRESS -pw PASSWORD
                    -tadd TO_ADDRESS [-p PORT] [-s [SUBJECT]] [-b [BODY]]
-                   [--ID ID] [--suffix_tag]
+                   [--ID ID] [--no_host_tag] [--suffix_tag]
 
 Send an email over SSL from the command line
 
@@ -16,10 +16,12 @@ optional arguments:
   -b [BODY], --body [BODY]
                         The body of the email, wrapped in single quotes ('')
                         (default: None)
-  --ID ID               Arbitrary string to include in email header (default:
-                        )
-  --suffix_tag          place time/server info tag at end of subject rather
-                        than beginning (default: False)
+  --ID ID               Arbitrary string to include in host tag (if present)
+                        (default: None)
+  --no_host_tag         disable host tag (time/server string) in subject
+                        (default: False)
+  --suffix_tag          place host tag at end of subject rather than beginning
+                        (default: False)
 
 required named arguments:
   -sadd SERVER_ADDRESS, --server_address SERVER_ADDRESS
