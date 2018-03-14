@@ -103,7 +103,7 @@ def line_iterator(f):
     # Check if file is FASTA to determine correct parsing behavior
     is_fa = check_fasta(f)
     if is_fa:
-        for h, s in fasta_parse(f):
+        for h, s in fasta_parse(f, trim_header=False):
             yield ">{}\n{}".format(h, s)
     else:
         with open(f) as infile:
