@@ -219,73 +219,6 @@ def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
 
     return results, win_ledger
 
-# def get_top_hits(blast, paralogs=False, query_match=None, seq_lengths=None):
-#     results = {}
-#     # dictionary to store tie-broken matches
-#     win_ledger = defaultdict(lambda: defaultdict(set))
-#     with open(blast) as blst:
-#         for l in blst:
-#             new_best_hit = False
-#             if l.startswith("#"):
-#                 continue
-#             (q, s, score, length, evalue) = parse_blast_line(
-#                 l, "query", "subject", "bitscore", "length", "e")
-#             current = {
-#                 'query': q,
-#                 'name': s,
-#                 'score': score,
-#                 'length': length,
-#                 'evalue': evalue
-#             }
-#             # do not consider hits to self if BLASTing against self,
-#             # but allow query/subject names to be the same
-#             if paralogs and q == s:
-#                 continue
-#             if query_match:
-#                 # use query_match dictionary to compare query lengths to
-#                 # match lengths to exclude matches where query percentage 
-#                 # is below query_match_threshold key
-#                 fraction = (length / query_match[q]) * 100
-#                 if fraction < query_match['query_match_threshold']:
-#                     continue
-#             if q in results:
-#                 #TODO refactor this decision tree into a function
-#                 # Check if this hit's score is better
-#                 defender_score = results[q]['score']
-#                 defender_name = results[q]['name']
-#                 if score > defender_score:
-#                     new_best_hit = True
-#                     loser_info = (defender_name, 'bitscore')
-#                     win_ledger[q]['losers'].add(loser_info)
-#                 elif score == defender_score:
-#                     defender_evalue = results[q]['evalue']   
-#                     if evalue < defender_evalue: # smaller is better
-#                         new_best_hit = True
-#                         loser_info = (defender_name, 'evalue')
-#                         win_ledger[q]['losers'].add(loser_info)
-#                     elif seq_lengths is not None:
-#                         # if scores are equal, check if sequence lenths
-#                         # have been provided as an additional tiebreaking
-#                         # criteria and look up the subject length to
-#                         # see if there's a difference
-#                         defender_length = seq_lengths[defender_name]
-#                         current_length = seq_lengths[s]
-#                         if current_length > defender_length:
-#                             loser_info = (defender_name, 'length')
-#                             win_ledger[q]['losers'].add(loser_info)
-#                             new_best_hit = True
-     
-#                 if new_best_hit is True:
-#                     win_ledger[q]['best'] = s
-                    
-#             else:
-#                 new_best_hit = True
-
-#             if new_best_hit is True:
-#                 results[q] = {"name": s, "score": score, "evalue": evalue}
-
-#     return results, win_ledger
-
 
 def get_reciprocals(d1, d2):
     """
@@ -296,8 +229,8 @@ def get_reciprocals(d1, d2):
 
     """
     reciprologs = set()
-    blast_directions = [d1, d2]
-    for first, second in [(d1, d2), (d2, d1)]:
+    blast_combos = [(d1, d2), (d2, d1)]
+    for first, second in blast_combos:
         for query, hit_info in first.items():
             best_hit = hit_info["name"]
             score = hit_info["score"]
@@ -496,7 +429,7 @@ def aggregate_orthos_strict(orthos):
     return aggregated
 
 def names_from_blastfile(blast_fn):
-    file_pattern = r'(.+)-vs-(.+)\.\w+\.blast'
+    file_pattern = r'(.+)-vs-(.+)\.t?blast[npx]'
     query_fn, subject_fn = re.findall(file_pattern, blast_fn)[0]
 
     return query_fn, subject_fn
@@ -526,8 +459,8 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
     fw_names = unique_filenames(query, subject)
     rv_names = fw_names[::-1]
 
-    fw_fn = '{}-vs-{}.{}.blast'.format(*fw_names, blast_type)
-    rv_fn = '{}-vs-{}.{}.blast'.format(*rv_names, blast_type)
+    fw_fn = '{}-vs-{}.{}'.format(*fw_names)
+    rv_fn = '{}-vs-{}.{}'.format(*rv_names)
 
     # use existing BLAST output unless --overwrite is specified
     if not os.path.isfile(fw_fn) or OVERWRITE:
