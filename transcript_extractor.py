@@ -301,7 +301,10 @@ def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
         yield header, seq
 
 
-def translate_seq(string, verbosity="single", phase=0):
+def translate_seq(
+    string, 
+    verbosity="single", 
+    phase=0,
     codonMap = {
         'AAA': ('K', 'Lys', 'Lysine'),
         'AAC': ('N', 'Asn', 'Asparagine'),
@@ -367,7 +370,7 @@ def translate_seq(string, verbosity="single", phase=0):
         'TAG': ('*', '*', 'STOP'),
         'TGA': ('*', '*', 'STOP'),
         'TAA': ('*', '*', 'STOP'),
-    }
+    }):
 
     def _get_codons(s, p=0):
         for i in range(0, len(s), 3):
