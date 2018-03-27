@@ -305,7 +305,7 @@ def translate_seq(
     string, 
     verbosity="single", 
     phase=0,
-    codonMap = {
+    codonMap={
         'AAA': ('K', 'Lys', 'Lysine'),
         'AAC': ('N', 'Asn', 'Asparagine'),
         'AAG': ('K', 'Lys', 'Lysine'),
