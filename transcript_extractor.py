@@ -552,10 +552,11 @@ def coding_length(coords):
 
 
 def get_coding_seq(seq, coord_list):
-    full_seq = ''
+    seq_list = []
     for coord in sorted(coord_list):
-        full_seq += get_subseq(seq, *coord)
-    
+        seq_list.append(get_subseq(seq, *coord))
+    full_seq = ''.join(seq_list)
+
     return full_seq
 
 
@@ -582,6 +583,7 @@ def format_output(region_seq, t_dict, verbose=False):
     header = '\t'.join(header_bits)
 
     return '>{}\n{}'.format(header, seq)
+    
 
 def get_runtime(start_time, p=3):
     """
