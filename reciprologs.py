@@ -459,8 +459,8 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
     fw_names = unique_filenames(query, subject)
     rv_names = fw_names[::-1]
 
-    fw_fn = '{}-vs-{}.{}'.format(*fw_names)
-    rv_fn = '{}-vs-{}.{}'.format(*rv_names)
+    fw_fn = '{}-vs-{}.{}'.format(*fw_names, blast_type)
+    rv_fn = '{}-vs-{}.{}'.format(*rv_names, blast_type)
 
     # use existing BLAST output unless --overwrite is specified
     if not os.path.isfile(fw_fn) or OVERWRITE:
