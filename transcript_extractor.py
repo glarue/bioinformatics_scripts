@@ -513,8 +513,8 @@ def longest_isoforms(transcript_dict, use_coords=False):
                     # even if they have unique gene name
                     coords = meta['info']['coords']
                     if any(overlap_check(coords, c) for c in seen_coords):
-                        seen_coords.add(coords)
                         continue
+                    seen_coords.add(coords)
                 if gene is not None:
                     seen_genes.add(gene)
                 length = coding_length(meta['children'])
