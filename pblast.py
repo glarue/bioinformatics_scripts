@@ -208,11 +208,11 @@ def local_blast(
     cmd_args = [str(c) for c in cmd_args]
     cmd_string = ' '.join(cmd_args)
     vs = "'{}' vs. '{}'".format(query_file, db_file)
-    print("[#] Starting BLAST on {}:\n{}"
+    print("[#] Starting BLAST run {}:\n{}"
           .format(vs, cmd_string), file=sys.stderr)
     subprocess.call(cmd_args)
     run_time = get_runtime(start_time)
-    print("[#] BLAST on {} finished in {}".format(vs, run_time), file=sys.stderr)
+    print("[#] BLAST: {} finished in {}".format(vs, run_time), file=sys.stderr)
     return filename
 
 
