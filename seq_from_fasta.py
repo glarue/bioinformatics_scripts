@@ -171,14 +171,17 @@ def info_from_args(args):
 
 def seqs_from_fasta(fasta, line_dict):
     num_keys = len(line_dict.keys())
-    for h, s in fasta_parse(fasta, separator=SEP_CHAR, trim_header=TRIM):
+    for h, s in fasta_parse(fasta, separator=SEP_CHAR, trim_header=False):
+        complete_header = h
+        if TRIM:
+            h = h.split()[0]
         try:
             seq_lines = line_dict[h]
         except KeyError:
             continue
         num_keys -= 1
         if seq_lines[0] == h:  # they want whole seq
-            yield s, {'label': h}
+            yield s, {'label': complete_header}
             if num_keys == 0:
                 break
         else:
