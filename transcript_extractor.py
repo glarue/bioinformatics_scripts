@@ -2,8 +2,7 @@
 """
 usage: transcript_extractor.py [-h] [-t] [-e] [-i] [-c] [-v] genome annotation
 
-Extract transcript/coding sequences from an annotation + genome file
-combination
+Extract transcript/coding sequences from a genome using an annotation file
 
 positional arguments:
   genome                genome file in FASTA format
@@ -609,8 +608,8 @@ def get_runtime(start_time, p=3):
 
 
 parser = argparse.ArgumentParser(
-    description='Extract transcript/coding sequences from '
-    'an annotation + genome file combination',
+    description='Extract transcript/coding sequences from a '
+    'genome using an annotation file',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument(
     'genome',
