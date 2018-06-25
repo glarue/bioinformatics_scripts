@@ -153,7 +153,6 @@ def make_blast_db(fasta, db_type="nucleotide"):
         "makeblastdb",
         "-in",
         fasta,
-        "-parse_seqids",
         "-dbtype",
         type_map[db_type]
     ]
@@ -187,7 +186,7 @@ def local_blast(
     db_abbrev = abbreviate(db_file)
     query_abbrev = abbreviate(query_file)
     if filename is None:
-        filename = "{}-vs-{}.{}.blast".format(
+        filename = "{}-vs-{}.{}".format(
             query_abbrev, db_abbrev, blast_type)
     cmd_args = [
         blast_type,
