@@ -28,6 +28,7 @@ optional arguments:
 """
 import sys
 import argparse
+from codecs import decode
 
 def fasta_parse(fasta, delimiter=">", separator="", trim_header=False):
     """
@@ -148,7 +149,7 @@ def seq_from_line(parent_seq, line):
     if info["strand"] == "-":
         seq = reverse_complement(seq)
     if FLANK:
-        seq = demarcate(seq, l_flank, r_flank)
+        seq = demarcate(seq, l_flank, r_flank, separator=FLANK_SEPARATOR)
     return seq
 
 
@@ -221,6 +222,14 @@ parser.add_argument(
     default=0
 )
 parser.add_argument(
+    '-s',
+    '--separator',
+    type=str,
+    help='Character to use to separate flanking sequence (if any) from main '
+    'sequence, which defaults to {tab}.',
+    default='\t'
+)
+parser.add_argument(
     '--unformatted',
     '-u',
     action='store_true',
@@ -237,6 +246,8 @@ args = parser.parse_args()
 
 FASTA = args.FASTA_file
 FLANK = args.flank
+FLANK_SEPARATOR = decode(args.separator, 'unicode escape')
+
 if args.full_header:
     TRIM = False
 else:
