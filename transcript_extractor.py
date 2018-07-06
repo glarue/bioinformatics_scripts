@@ -42,18 +42,28 @@ class GFFLineInfo(object):
         self.bits = self.__split_on_tabs(line)
         try:
             self.region = self.bits[0]
-            self.start = min(map(int, self.bits[3:5]))
-            self.stop = max(map(int, self.bits[3:5]))
+            try:
+                self.start = min(map(int, self.bits[3:5]))
+                self.stop = max(map(int, self.bits[3:5]))
+            except ValueError:
+                self.start = None
+                self.stop = None
             self.strand = self.bits[6]
             if self.strand not in ('+', '-'):
                 self.strand = '+'
+            if self.bits[7] in ['0', '1', '2']:
+                self.phase = int(self.bits[7])
+            else:
+                self.phase = None
             self.infostring = self.bits[8]
-            # self.feat_type = self.get_type()
             self.feat_type = self.bits[2].lower()
             self.parent = self.get_parent()
+            self.grandparent = None
+            # try to get grandparent for child types
+            if self.feat_type in ('cds', 'exon'):
+                self.grandparent = self.__field_match(self.infostring, ['gene_id', 'geneID'], delimiter=';')
             self.name = self.get_ID()
             self.line_number = line_number
-            self.protein_coding = self.is_protein_coding()
         except TypeError:
             raise
 
@@ -78,9 +88,9 @@ class GFFLineInfo(object):
     @staticmethod
     def __field_match(infostring, tags, delimiter, tag_order=False):
         if tag_order:
-            # check for first match of tags in order 
+            # check for first match of tags in order
             try:
-                tags = [next(t for t in tags if t.lower() in infostring)]
+                tags = [next(t for t in tags if t.lower() in infostring.lower())]
             except StopIteration:
                 return None
         info_bits = infostring.split(delimiter)
@@ -102,7 +112,7 @@ class GFFLineInfo(object):
         Classifies annotation lines into type categories,
         taking into account edge cases like 'processed transcript'
         and 'pseudogenic transcript'.
-        
+
         """
         og_type = self.bits[2].lower()
         if og_type == 'mrna':
@@ -120,7 +130,7 @@ class GFFLineInfo(object):
         # check for explicit mention of transcript in ID
         try:
             id_string = next(
-                (f for f in delimiter.split(self.infostring) 
+                (f for f in delimiter.split(self.infostring)
                 if f.startswith("ID")))
 
             if any(tag in id_string for tag in ('transcript', 'mrna')):
@@ -142,32 +152,14 @@ class GFFLineInfo(object):
                 return og_type
 
 
-    def is_protein_coding(self):
-        """
-        Infer whether a annotation feature is protein coding or
-        not by a couple of rough heuristics.
-        
-        """
-        og_type = self.bits[2].lower()
-        # Clear cases where it should be protein-coding by default
-        if og_type in ('gene', 'transcript', 'mrna'):
-            return True
-        infostring = self.infostring
-        # This amounts to a blacklist of all things that don't explicitly
-        # state that they're protein coding
-        if 'protein_coding' in infostring:
-            return True
-        else:
-            return False
-
-
     def get_ID(self, delimiter=";"):
         """
         Finds the ID of a given annotation file line.
 
         """
         # first, do it the easy way
-        infostring = self.infostring        
+        prefix = None
+        infostring = self.infostring
         match = self.__field_match(infostring, ["ID="], delimiter)
         if match:
             return match
@@ -187,7 +179,9 @@ class GFFLineInfo(object):
         try:
             tags = tag_selector[feat_type]
         except KeyError:
-            # get any ID available
+            # get any ID available, prepended with the feature type
+            # to keep different features of the same transcript unique
+            prefix = self.feat_type
             tags = ['transcriptID', 'transcript_ID', 'gene_ID', 'geneID']
 
         match = self.__field_match(
@@ -198,23 +192,26 @@ class GFFLineInfo(object):
         if match is None and infostring.count(";") < 2:
             match = infostring.split(";")[0]
 
+        if prefix:
+            match = '{}_{}'.format(prefix, match)
+
         return match
 
 
     def get_parent(self, delimiter=";"):
         """
         Retrieves parent information from an annotation line.
-        
+
         """
         feat_type_converter = {"cds": "exon", "mrna": "transcript"}
         feat_type = self.feat_type
         if feat_type in feat_type_converter:
             feat_type = feat_type_converter[feat_type]
         child_tags = [
-            "Parent=", "proteinId", "protein_ID", "transcriptId",
-            "transcript_ID"
+            "Parent=", "transcript_ID",
+            "transcriptId", "proteinId", "protein_ID"
         ]
-        transcript_tags = ["Parent=", "geneId", "gene_ID"]
+        transcript_tags = ["Parent=", "gene_ID", "geneId"]
         gene_tags = ["Parent="]
         tag_selector = {
             "gene": gene_tags,
@@ -226,7 +223,7 @@ class GFFLineInfo(object):
         except KeyError:
             tags = list(set(child_tags + transcript_tags))
         infostring = self.infostring
-        match = self.__field_match(infostring, tags, delimiter)
+        match = self.__field_match(infostring, tags, delimiter, tag_order=True)
         if not match and feat_type == "transcript":
             match = self.get_ID()
 
@@ -394,7 +391,8 @@ def translate_seq(
 
 def get_transcripts(gff, child_type):
     transcripts = defaultdict(dict)
-    feature_info = {}
+    feature_info = defaultdict(dict)
+    grandparents = defaultdict(dict)
     child_type_found = False
     regions_with_content = set()
     orphans = 0
@@ -416,14 +414,16 @@ def get_transcripts(gff, child_type):
                     'region': feat.region,
                     'inferred': False
                 }
-                if feat.name not in feature_info:
-                    feature_info[feat.name] = info_dict
-                # if feat.name not in transcripts[feat.region]:
-                #     transcripts[feat.region][feat.name] = {
-                #         'info': info_dict,
-                #         'children': []}
-                # else:  # made by child
-                #     transcripts[feat.region][feat.name]['info'] = info_dict
+                if feat.name not in feature_info[feat.region]:
+                    feature_info[feat.region][feat.name] = info_dict
+                if feat.name in transcripts[feat.region]:  # made by child; update
+                    # don't override existing values with Nones
+                    updater = {k: v for k, v in info_dict.items() if v is not None}
+                    transcripts[feat.region][feat.name]['info'].update(updater)
+                else:
+                    transcripts[feat.region][feat.name] = {
+                        'info': info_dict,
+                        'children': set()}
             elif feat.feat_type == child_type:
                 if not child_type_found:
                     child_type_found = True
@@ -436,42 +436,53 @@ def get_transcripts(gff, child_type):
                 region = feat.region
                 if parent not in transcripts[region]:
                     try:
-                        parent_info = feature_info[parent]
+                        parent_info = feature_info[region][parent]
                     except KeyError:
                         parent_info = {
                             'strand': feat.strand,
                             'region': region,
                             'name': parent,
                             'inferred': True,
-                            'parent': None,
+                            'parent': feat.grandparent,
                             'coords': None
                         }
                     transcripts[region][parent] = {
                         'info': parent_info,
-                        'children': []}
+                        'children': set()}
+                if feat.grandparent and parent not in grandparents[region]:
+                        grandparents[region][parent] = feat.grandparent
+                    # parent_record = transcripts[region][parent]
+                    # existing_gp = parent_record['info']['parent']
+                    # if existing_gp != feat.grandparent:
+                    #     parent_record['info']['parent'] = feat.grandparent
                 tr = transcripts[region][parent]
-                tr['children'].append((start, stop))
+                tr['children'].add((start, stop))
                 regions_with_content.add(region)
-    
+
     if orphans:
         print('[#] Skipped {} orphan {} features'.format(
               orphans, child_type), file=sys.stderr)
 
-    final_transcripts = defaultdict(dict)
+    final_transcripts = {}
     for region, trs in transcripts.items():
         if region not in regions_with_content:
             continue
+        elif region not in final_transcripts:
+            final_transcripts[region] = defaultdict(dict)
         for name, tr in trs.items():
+            if not tr['children']:
+                continue
             if tr['info']['inferred']:  # need to infer coords from children
                 min_coord = min([e[0] for e in tr['children']])
                 max_coord = max([e[1] for e in tr['children']])
                 tr['info']['coords'] = (min_coord, max_coord)
-            final_transcripts[name] = tr
+            # use child grandparent info for transcripts without preexisting
+            # parent info (if available)
+            if name in grandparents[region] and tr['info']['parent'] == name:
+                tr['info']['parent'] = grandparents[region][name]
+            final_transcripts[region][name] = tr
 
-    # transcripts = {
-    #     k: v for k, v in transcripts.items() if k in regions_with_content}
-    
-    return transcripts, child_type_found
+    return final_transcripts, child_type_found
 
 
 def overlap_check(a, b):
@@ -565,19 +576,20 @@ def format_output(region_seq, t_dict, verbose=False):
     strand = t_info['strand']
     region = t_info['region']
     span = ':'.join(map(str, t_info['coords']))
-    length = str(t_info['length'])
+    # length = str(t_info['length'])
     seq_coords = t_dict['children']
     seq = get_coding_seq(region_seq, seq_coords)
     if strand == '-':
         seq = reverse_complement(seq)
     if TRANSLATE is True:
         seq = translate_seq(seq)
+    length = str(len(seq))
     gene = t_info['parent']
     if gene is None: 
         gene = 'unknown'
     header_bits = [t_name, gene, region, strand, span, length]
     if verbose is True:
-        coord_string = ','.join(['-'.join(list(map(str, c))) for c in seq_coords])
+        coord_string = ','.join(['-'.join(list(map(str, c))) for c in sorted(seq_coords)])
         header_bits.append(coord_string)
     header = '\t'.join(header_bits)
 
