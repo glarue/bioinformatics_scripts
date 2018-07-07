@@ -419,11 +419,8 @@ parser.add_argument(
     '--parallel_processes',
     help=(
         'run the BLAST step using multiple parallel processes; '
-        'without specific input will use half of available system CPUs'),
-    type=int,
-    const=round(cpu_count() / 2),
-    nargs='?',
-    default=round(cpu_count() / 2)
+        'if unspecified, will use half of available system CPUs'),
+    type=int
 )
 parser.add_argument(
     '-s',
@@ -482,6 +479,14 @@ THREADS = args.threads
 E_VALUE = args.e_value
 OUT_FORMAT = args.output_format
 OVERWRITE = args.clobber_db
+
+# assume if THREADS is specified alone, the user wants
+# to replace parallelism with threading rather than 
+# blowing up the CPU count to (cores/2) * THREADS
+if not PARALLEL and THREADS:
+    SINGLE = True
+elif not PARALLEL and not THREADS:
+    PARALLEL = round(cpu_count() / 2)
 
 run_files = {'query': args.query, 'subject': args.subject}
 
