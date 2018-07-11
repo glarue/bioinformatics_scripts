@@ -472,6 +472,7 @@ def get_transcripts(gff, child_type):
         for name, tr in trs.items():
             if not tr['children']:
                 continue
+            tr['info']['length'] = coding_length(tr['children'])
             if tr['info']['inferred']:  # need to infer coords from children
                 min_coord = min([e[0] for e in tr['children']])
                 max_coord = max([e[1] for e in tr['children']])
@@ -512,10 +513,16 @@ def longest_isoforms(transcript_dict, use_coords=False):
     for region, transcripts in transcript_dict.items():
         if region not in longest_isoforms:
             longest_isoforms[region] = {}
+        # coords only have meaning within a given region
         seen_coords = set()
         # sort by longest transcripts first
+        
+        # if there are transcripts with the same coding length,
+        # sorting may be different each time within those equal-length
+        # transcripts, which may change the output if a given transcript's 
+        # coord span is larger/smaller
         for name, meta in sorted(transcripts.items(), 
-        key=lambda x: coding_length(x[1]['children']), reverse=True):
+        key=lambda x: (-x[1]['info']['length'], x[1]['info']['name'])):
             gene = meta['info']['parent']
             if gene not in seen_genes:
                 if use_coords:
@@ -527,8 +534,8 @@ def longest_isoforms(transcript_dict, use_coords=False):
                     seen_coords.add(coords)
                 if gene is not None:
                     seen_genes.add(gene)
-                length = coding_length(meta['children'])
-                meta['info']['length'] = length
+                # length = coding_length(meta['children'])
+                # meta['info']['length'] = length
                 longest_isoforms[region][name] = meta
     
     return longest_isoforms
@@ -539,10 +546,6 @@ def finalize_transcripts(transcript_dict):
     Reformats transcripts, and returns a dictionary.
     
     """
-    # identify longest isoforms
-    # sort by length, then use either gene name or overlap() function 
-    # to determine if subsequent transcripts are isoforms of longest 
-    # version and skip if they are
     finalized = defaultdict(dict)
     for region, transcripts in transcript_dict.items():
         for name, meta in sorted(transcripts.items()):
