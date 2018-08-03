@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-d] [-s] [-m] [-r]
+usage: top_blast_hits.py [-h] [-n NUMBER_OF_HITS] [-e E_VALUE_CUTOFF] [-d]
+                         [-s] [-m] [-r]
                          blast_file
 
 Reports the top n BLAST hits for each query in a (tabular) blast output file
@@ -14,6 +15,9 @@ optional arguments:
   -n NUMBER_OF_HITS, --number_of_hits NUMBER_OF_HITS
                         number of hits to report for each unique query
                         (default: 1)
+  -e E_VALUE_CUTOFF, --e_value_cutoff E_VALUE_CUTOFF
+                        exclude hits with e-value greater than this value
+                        (default: None)
   -d, --allow_duplicate_target_hits
                         allow multiple hits to the same subject to be included
                         (default: False)
@@ -64,6 +68,12 @@ parser.add_argument(
     help="number of hits to report for each unique query",                
     default=1)
 parser.add_argument(
+    "-e",
+    "--e_value_cutoff",
+    help="exclude hits with e-value greater than this value",
+    type=float
+)
+parser.add_argument(
     "-d", 
     "--allow_duplicate_target_hits",
     action="store_true", 
@@ -100,6 +110,7 @@ started = time.time()
 # Figure out what arguments we're working with
 BLASTFILE = args.blast_file
 N = args.number_of_hits
+EVALUE = args.e_value_cutoff
 DUPES = args.allow_duplicate_target_hits
 NAME_SORT = args.sort_by_name
 MEM_REDUCE = args.memory_efficient
@@ -115,7 +126,10 @@ with open(BLASTFILE) as blast:
         bits = hit.strip().split('\t')
         query = bits[0]
         subject = bits[1]
+        e_val = float(bits[-2])
         if query == subject and REDUNDANT_IDS is False:
+            continue
+        if EVALUE and e_val > EVALUE:
             continue
         bitscore = float(bits[-1])
         # Attach the bitscore and subject to allow for sorting at the end
@@ -125,7 +139,7 @@ with open(BLASTFILE) as blast:
             hitdict[query] = sorted(hitdict[query], key=lambda x: x[1], reverse=True)[:N]
         total_hits += 1
 
-# The <file> argument directs output to standard error rather than
+# The {file} argument directs output to standard error rather than
 # standard out, to maintain clean redirection of the filtered query
 # output to a file
 print("[#] Indexed {} BLAST hits".format(total_hits), file=sys.stderr)
