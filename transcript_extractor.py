@@ -698,9 +698,7 @@ if not child_found:
     if not child_found:
         sys.exit('[!] No {} entries found in annotation.'.format(child_type))
 
-if ISOFORMS:  # don't filter out extra isoforms
-    transcripts = finalize_transcripts(transcripts)
-else:
+if not ISOFORMS:
     transcripts = longest_isoforms(transcripts, FILTER_BY_COORDS)
 
 seq_count = 0
