@@ -30,7 +30,10 @@ import argparse
 from collections import defaultdict
 from operator import itemgetter
 import time
-
+try:
+    from biogl import flex_open as open_func
+except ModuleNotFoundError:
+    open_func = open
 
 class GFFLineInfo(object):
     """
@@ -274,7 +277,7 @@ def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
 
     """
     header, seq = None, []
-    with open(fasta) as f:
+    with open_func(fasta) as f:
         for line in f:
             if line.startswith(delimiter):
                 if header:  # associate accumulated seq with header
@@ -396,7 +399,7 @@ def get_transcripts(gff, child_type):
     child_type_found = False
     regions_with_content = set()
     orphans = 0
-    with open(gff) as annot:
+    with open_func(gff) as annot:
         for ln, line in enumerate(annot):
             feat = None
             try:
