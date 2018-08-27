@@ -373,7 +373,9 @@ def translate_seq(
 
     def _get_codons(s, p=0):
         for i in range(0, len(s), 3):
-            yield s[i + p:i + p + 3]
+            codon = s[i + p:i + p + 3]
+            if codon:  # don't return blank strings
+                yield codon
 
     verbosityD = {"single": 0, "short": 1, "long": 2}
     string = string.replace(" ", "").upper()  # remove spaces if present
