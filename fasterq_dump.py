@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 """
 usage: fasterq_dump.py [-h] [-f FILE] [-k] [accessions [accessions ...]]
@@ -39,13 +39,13 @@ def grouper(iterable, n, fillvalue=None):
 
 def fastq_parse(fastq):
     FqRec = namedtuple(
-        "FqRec", 
+        "FqRec",
         [
-            "id", 
-            "seq", 
-            "meta", 
-            "quality", 
-            "full_record", 
+            "id",
+            "seq",
+            "meta",
+            "quality",
+            "full_record",
             "cleaned"
         ]
     )
@@ -94,7 +94,7 @@ def paired_check(acc):
 def fetch_sra(acc, overwrite=False):
     """
     Grabs an SRA file from NCBI.
-    
+
     """
     sra_filename = '{}.sra'.format(acc)
 
@@ -105,7 +105,7 @@ def fetch_sra(acc, overwrite=False):
             file=sys.stderr
         )
         return sra_filename
-    
+
     alpha = acc[:3]
     first_six = acc[:6]
 
@@ -133,6 +133,26 @@ def acc_list_from_file(acc_file):
     return accs
 
 
+def format_range(range_string):
+    begin, end = range_string.split('-')
+    prefix = begin[:3]
+    suffix = begin[3:]
+    num_length = len(suffix)
+    # leading zeroes are removed in the map call below, so calculate
+    # how many there might be to add them in later
+    # leading_zero_n = len(suffix) - len(suffix.lstrip('0'))
+    # leading_zero_string = '0' * leading_zero_n
+    start, stop = list(map(int, [e[3:] for e in [begin, end]]))
+    numeric_range = list(range(start, stop+1))
+    zero_strings = ['0' * (num_length - len(str(n))) for n in numeric_range]
+    formatted_range = [
+        prefix + zeroes + str(r)
+        for zeroes, r in zip(zero_strings, numeric_range)
+    ]
+
+    return formatted_range
+
+
 def clean_args(arguments):
     stage_1 = []
     for arg in arguments:
@@ -144,11 +164,7 @@ def clean_args(arguments):
         if '-' not in c:
             final_args.append(c)
             continue
-        begin, end = c.split('-')
-        prefix = begin[:3]
-        start, stop = list(map(int, [e[3:] for e in [begin, end]]))
-        numeric_range = list(range(start, stop+1))
-        acc_range = [prefix+str(r) for r in numeric_range]
+        acc_range = format_range(c)
         final_args += acc_range
 
     return final_args
@@ -232,11 +248,11 @@ for acc in accs:
         acc_filename = fetch_sra(acc, args.overwrite)
         sra_files.append(acc_filename)
     else:
-        # we don't want to pre-fetch SRA since we're 
+        # we don't want to pre-fetch SRA since we're
         # only getting a subset of the reads
         acc_filename = acc
     read_type = paired_check(acc)
-    print('[#] Detected read type for {}: {}'.format(acc, read_type), 
+    print('[#] Detected read type for {}: {}'.format(acc, read_type),
           file=sys.stderr)
     cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
     dump_args = shlex.split(cmd)
