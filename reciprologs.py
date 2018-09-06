@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+# the above uses specific Python version; allows script name in top
+##!/usr/bin/env python3  
+# the above sources Python from $PATH
 
 """
 usage: reciprologs.py [-h] [-p [PARALLEL_PROCESSES]] [-t PERCENTAGE]
@@ -622,7 +625,7 @@ for k, v in call_options.items():
 
 # get reciprologs for each pairwise combo of files
 pairwise_reciprolog_sets = []
-for q, s in combinations(INPUT_FILES, 2):
+for q, s in combinations(sorted(INPUT_FILES), 2):
     reciprolog_set, win_ledger = pair_reciprologs(
         q, s, BLAST_TYPE, QUERY_PERCENTAGE, optional)
     if LOGGING:

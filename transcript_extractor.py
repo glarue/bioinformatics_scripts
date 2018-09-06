@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
+# the above uses specific Python version; allows script name in top
+##!/usr/bin/env python3  
+# the above sources Python from $PATH
+
 """
 usage: transcript_extractor.py [-h] [-t] [-e] [-i] [-c] [-v] genome annotation
 
@@ -498,10 +502,8 @@ def overlap_check(a, b):
     """
     lowest = min([a, b], key=lambda x: min(x))
     highest = max([a, b], key=lambda x: min(x))
-    if min(highest) <= max(lowest):
-        return True
-    else:
-        return False
+
+    return min(highest) <= max(lowest)
 
 
 def longest_isoforms(transcript_dict, use_coords=False):
