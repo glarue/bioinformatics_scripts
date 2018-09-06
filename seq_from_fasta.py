@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 """
 usage: seq_from_fasta.py [-h] [-i INFO_FILE] [--flank FLANK] [--unformatted]
@@ -29,43 +29,7 @@ optional arguments:
 import sys
 import argparse
 from codecs import decode
-
-def fasta_parse(fasta, delimiter=">", separator="", trim_header=False):
-    """
-    Iterator which takes FASTA as input. Yields
-    header/value pairs. Separator will be
-    used to join the return value; use separator=
-    None to return a list.
-
-    If trim_header, parser will return the
-    FASTA header up to the first space character.
-    Otherwise, it will return the full, unaltered
-    header string.
-
-    """
-    header, seq = None, []
-    with open(fasta) as f:
-        for line in f:
-            if line.startswith(delimiter):
-                if header is not None:
-                    if separator is not None:
-                        seq = separator.join(str(e) for e in seq)
-                    yield header, seq
-                header = line.strip().lstrip(delimiter)
-                if trim_header:
-                    try:
-                        header = header.split()[0]
-                    except IndexError:  # blank header
-                        header = ""
-                seq = []
-            elif line.startswith('#'):
-                continue
-            else:
-                if line.strip():  # don't collect blank lines
-                    seq.append(line.rstrip('\n'))
-        if separator is not None:
-            seq = separator.join(str(e) for e in seq)
-        yield header, seq
+from biogl import fasta_parse, flex_open, rev_comp
 
 
 def demarcate(string, left_margin, right_margin, separator='|'):
@@ -80,23 +44,6 @@ def demarcate(string, left_margin, right_margin, separator='|'):
         if i != 0:
             stringList.insert(i, separator)
     return "".join(stringList)
-
-
-def reverse_complement(seq):
-    rev_list = []
-    base_map = {
-        'A':'T',
-        'T':'A',
-        'C':'G',
-        'G':'C',
-        'N':'N',
-        'U':'T'
-    }
-    for c in seq:
-        rev_list.append(base_map[c.upper()])
-    rev_seq = ''.join(reversed(rev_list))
-
-    return rev_seq
 
 
 def get_subseq(parent_seq, start, stop, flank=0):
@@ -147,7 +94,7 @@ def seq_from_line(parent_seq, line):
     seq, l_flank, r_flank = get_subseq(
         parent_seq, info["start"], info["stop"], flank=FLANK)
     if info["strand"] == "-":
-        seq = reverse_complement(seq)
+        seq = rev_comp(seq)
     if FLANK:
         seq = demarcate(seq, l_flank, r_flank, separator=FLANK_SEPARATOR)
     return seq
@@ -267,6 +214,8 @@ else:
         sys.exit('Insufficient sequence information provided. Exiting.')
     direct_args = args.sequence_information
     info_dict = info_from_args(direct_args)
+
+FASTA = flex_open(FASTA)
 
 for seq, seq_info in seqs_from_fasta(FASTA, info_dict):
     if seq_info["label"]:
