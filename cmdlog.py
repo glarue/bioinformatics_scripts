@@ -13,6 +13,8 @@ from os.path import isfile, join
 import subprocess
 import time
 from datetime import datetime
+import argparse
+
 
 def listFiles(mypath):
     """
@@ -48,13 +50,40 @@ def time_sort(t, fmt):
     parsed = datetime.strptime(t, fmt)
     return parsed
 
-if len(sys.argv) == 1:
-    sys.exit(
-        'usage: cmdlog.py "[commands]"'
-        '\n\nnote: all commands must be wrapped in double quotes')
+def log_format(time_string, dir, cmd, note=None):
+    header = '{} | {}'.format(time_string, dir)
+    if note:
+        note = '# NOTE: {}'.format(note)
+    strings = [s for s in [note, cmd] if s]
+    strings = '\n'.join(strings)
+    log_string = '# {}\n{}'.format(header, strings)
 
-ARGS = sys.argv[1]
-ARG_LIST = ARGS.split()
+    return log_string
+
+parser = argparse.ArgumentParser(
+    description='Log a shell commmand with optional note'
+)
+parser.add_argument(
+    'shell_cmds',
+    metavar='shell commands',
+    help='one or more commands to be sent to the shell '
+    '(may require single or double quotes)',
+    nargs='+'
+)
+
+
+args, unknown = parser.parse_known_args()
+ARG_LIST = args.shell_cmds + unknown
+
+# ARG_LIST = sys.argv [1:]
+
+ARG_STRING = ' '.join(ARG_LIST)
+
+TIME_FMT = "%Y-%m-%d@%H:%M:%S"
+
+# determine where Bash is located to allow execution of
+# Bash-specific commands (as opposed to the default sh)
+SHELL = subprocess.check_output('echo $SHELL', shell=True, universal_newlines=True).strip()
 
 # Guess where logfile should be put
 if (">" or ">>") in ARG_LIST:
@@ -69,49 +98,27 @@ elif ("cp" or "mv") in ARG_LIST:
 else:
     out_dir = os.getcwd()
 
-# Set logfile location within the inferred output directory
-LOGFILE = out_dir + "/cmdlog_history.log"
-
-# Get file list state prior to running
 all_files = listFiles(out_dir)
-pre_stats = [os.path.getmtime(f) for f in all_files]
+
+# Set logfile location within the inferred output directory
+LOGFILE = out_dir + "/cmdlog.log"
+
+# ask for description of command to include in log
+note = input('[#] (cmdlog) Note for log (enter to skip):\n')
+
 
 # Run the desired external commands
-subprocess.call(ARGS, shell=True)
+subprocess.call(ARG_STRING, shell=True, executable=SHELL)
 
 # Get done time of external commands
-TIME_FMT = "%Y-%m-%d@%H:%M:%S"
 log_time = time.strftime(TIME_FMT)
 
-# Get existing entries from logfile, if present
-if LOGFILE in all_files:
-    logged = read_log(LOGFILE)
+if not os.path.isfile(LOGFILE):
+    log = open(LOGFILE, 'w')
 else:
-    logged = {}
-
-# Get file list state after run is complete
-post_stats = [os.path.getmtime(f) for f in all_files]
-post_files = listFiles(out_dir)
-
-# Find files whose states have changed since the external command
-changed = [e[0] for e in zip(all_files, pre_stats, post_stats) if e[1] != e[2]]
-new = [e for e in post_files if e not in all_files]
-all_modded = list(set(changed + new))
-
-if not all_modded:  # exit early, no need to log
-    sys.exit(0)
-
-# Replace files that have changed, add those that are new
-for f in all_modded:
-    name = os.path.basename(f)
-    logged[name] = [ARGS, log_time]
+    log = open(LOGFILE, 'a')
 
 # Write changed files to logfile
-with open(LOGFILE, 'w') as log:
-    for name, info in sorted(logged.items(), key=lambda x: time_sort(x[1][1], TIME_FMT)):
-        cmd, mod_time = info
-        if not cmd.startswith("\""):
-            cmd = "\"{}\"".format(cmd)
-        log.write("\t".join([mod_time, name, cmd]) + "\n")
+log.write(log_format(log_time, out_dir, ARG_STRING, note) + '\n\n')
 
 sys.exit(0)
