@@ -125,7 +125,8 @@ def db_check(db_filename):
     db_name = os.path.basename(db_filename)
     db_dir_files = os.listdir(db_directory)
     db_dir_files = [f for f in db_dir_files if f.startswith(db_name)]
-    db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
+    # db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
+    db_endings = ('sq', 'in', 'hr')
     # get just the file endings
     db_files = [f.split('.')[-1] for f in db_dir_files]
     present_endings = set([f[-2:] for f in db_files])
@@ -261,7 +262,7 @@ def make_pro(fasta, ftype=''):
     return out_name
 
 
-def prep_blast(subject, query, blast_type, overwrite=True):
+def prep_blast(subject, query, blast_type, no_format=False, overwrite=True):
     db_type_map = {
         'blastn': {
             'query': 'nucleotide',
@@ -289,13 +290,14 @@ def prep_blast(subject, query, blast_type, overwrite=True):
         target_format[ftype] = db_type_map[blast_type][ftype]
 
     # convert the appropriate files to protein if needed
-    for ftype, fn in blast_files.items():
-        fmt = target_format[ftype]
-        if fmt == 'protein' and seq_type(fn) != 'protein':
-            fn = make_pro(fn, ftype)
-            # add new fn to dict
-            target_format[ftype] = fmt
-            blast_files[ftype] = fn
+    if not no_format:
+        for ftype, fn in blast_files.items():
+            fmt = target_format[ftype]
+            if fmt == 'protein' and seq_type(fn) != 'protein':
+                fn = make_pro(fn, ftype)
+                # add new fn to dict
+                target_format[ftype] = fmt
+                blast_files[ftype] = fn
     
     subject = blast_files['subject']
     query = blast_files['query']
@@ -303,11 +305,13 @@ def prep_blast(subject, query, blast_type, overwrite=True):
     # check for already-created database
     if db_check(subject):
         if overwrite:
+            print('[#] Replacing existing BLAST database for \'{}\''
+                  .format(subject))
             make_blast_db(subject, db_type=target_format['subject'])
         else:
             print('[#] Using existing BLAST database for \'{}\''
             .format(subject), file=sys.stderr)
-    else:
+    elif not no_format:
         make_blast_db(subject, db_type=target_format['subject'])
 
     return subject, query
@@ -458,6 +462,12 @@ parser.add_argument(
     default=1e-10
 )
 parser.add_argument(
+    '--no_auto_format',
+    help='disable helper operations that auto-format subject/query as needed '
+    'and build BLAST database if not already present',
+    action='store_true'
+)
+parser.add_argument(
     '--clobber_db',
     help='create new database even if one already exists',
     action='store_true'
@@ -471,13 +481,13 @@ main_start_time = time.time()
 args, EXTRA_ARGS = parser.parse_known_args()
 
 BLAST_TYPE = args.blast_type
-# THREADS = args.threads
 PARALLEL = args.parallel_processes
 SINGLE = args.single
 OUT_NAME = args.output_name
 THREADS = args.threads
 E_VALUE = args.e_value
 OUT_FORMAT = args.output_format
+NO_AUTO = args.no_auto_format
 OVERWRITE = args.clobber_db
 
 # assume if THREADS is specified alone, the user wants
@@ -490,9 +500,10 @@ elif not PARALLEL and not THREADS:
 
 run_files = {'query': args.query, 'subject': args.subject}
 
-for ftype, fn in run_files.items():
-    if not is_fasta(fn):
-        run_files[ftype] = make_fasta(fn)
+if not NO_AUTO:
+    for ftype, fn in run_files.items():
+        if not is_fasta(fn):
+            run_files[ftype] = make_fasta(fn)
 
 SUBJECT = run_files['subject']
 QUERY = run_files['query']
@@ -504,7 +515,8 @@ if not OUT_NAME:
         subj,
         BLAST_TYPE)
 
-SUBJECT, QUERY = prep_blast(SUBJECT, QUERY, BLAST_TYPE, overwrite=OVERWRITE)
+SUBJECT, QUERY = prep_blast(
+    SUBJECT, QUERY, BLAST_TYPE, no_format=NO_AUTO, overwrite=OVERWRITE)
 
 current_runtime = get_runtime(main_start_time)
 print('[#] Database prep finished in {}'.format(current_runtime))
