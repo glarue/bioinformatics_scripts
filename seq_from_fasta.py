@@ -188,8 +188,8 @@ parser.add_argument(
     default='\t'
 )
 parser.add_argument(
-    '--unformatted',
     '-u',
+    '--unformatted',
     action='store_true',
     help=('leave original file formatting intact (e.g. don\'t join '
           'multi-line entries into a single line)')
