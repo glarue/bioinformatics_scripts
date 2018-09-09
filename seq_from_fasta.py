@@ -117,7 +117,7 @@ def info_from_args(args):
     return {loc: [line_from_args(args)]}
 
 
-def seqs_from_fasta(fasta, line_dict):
+def seqs_from_fasta(fasta, line_dict, exclude_header=False):
     num_keys = len(line_dict.keys())
     for h, s in fasta_parse(fasta, separator=SEP_CHAR, trim_header=False):
         complete_header = h
@@ -129,7 +129,11 @@ def seqs_from_fasta(fasta, line_dict):
             continue
         num_keys -= 1
         if seq_lines[0] == h:  # they want whole seq
-            yield s, {'label': complete_header}
+            if exclude_header:
+                label = None
+            else:
+                label = complete_header
+            yield s, {'label': label}
             if num_keys == 0:
                 break
         else:
@@ -155,10 +159,11 @@ parser.add_argument(
 parser.add_argument(
     'sequence_information',
     nargs='*',
+    metavar='header strand start stop [label]',
     help='header strand start stop [label]'
 )
 parser.add_argument(
-    '-i',
+    '-f',
     '--info_file',
     help='file with information for sequences on separate lines.'
 )
@@ -180,13 +185,20 @@ parser.add_argument(
     '--unformatted',
     '-u',
     action='store_true',
-    help=("leave original file formatting intact (e.g. don't join "
-          "multi-line entries into a single line)")
+    help=('leave original file formatting intact (e.g. don\'t join '
+          'multi-line entries into a single line)')
+)
+parser.add_argument(
+    '-e',
+    '--exclude_header',
+    action='store_true',
+    help='exclude the header line from the output (does not apply to '
+    'explicitly labeled queries)'
 )
 parser.add_argument(
     '--full_header',
     action='store_true',
-    help="match on full header string (including whitespace)"
+    help='match on full header string (including whitespace)'
 )
 
 args = parser.parse_args()
@@ -194,6 +206,7 @@ args = parser.parse_args()
 FASTA = args.FASTA_file
 FLANK = args.flank
 FLANK_SEPARATOR = decode(args.separator, 'unicode escape')
+EXCLUDE_HEADER = args.exclude_header
 
 if args.full_header:
     TRIM = False
@@ -210,14 +223,15 @@ if args.info_file:
     list_file = args.info_file
     info_dict = info_from_file(list_file)
 else:
-    if 2 < len(args.sequence_information) < 4:
+    info_length = len(args.sequence_information)
+    if 2 <= info_length < 4:
         sys.exit('Insufficient sequence information provided. Exiting.')
     direct_args = args.sequence_information
     info_dict = info_from_args(direct_args)
 
 FASTA = flex_open(FASTA)
 
-for seq, seq_info in seqs_from_fasta(FASTA, info_dict):
+for seq, seq_info in seqs_from_fasta(FASTA, info_dict, EXCLUDE_HEADER):
     if seq_info["label"]:
         print(">{}".format(seq_info["label"]))
     print(seq)
