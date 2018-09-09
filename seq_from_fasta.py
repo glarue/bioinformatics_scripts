@@ -2,7 +2,7 @@
 
 """
 usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR]
-                         [--unformatted] [-e] [--full_header]
+                         [-u] [-e] [--full_header]
                          FASTA_file [header strand start stop [label]
                          [header strand start stop [label] ...]]
 
@@ -25,7 +25,7 @@ optional arguments:
   -s SEPARATOR, --separator SEPARATOR
                         Character to use to separate flanking sequence (if
                         any) from main sequence, which defaults to {tab}.
-  --unformatted, -u     leave original file formatting intact (e.g. don't join
+  -u, --unformatted     leave original file formatting intact (e.g. don't join
                         multi-line entries into a single line)
   -e, --exclude_header  exclude the header line from the output (does not
                         apply to explicitly labeled queries)
