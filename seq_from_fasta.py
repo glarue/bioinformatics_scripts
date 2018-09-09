@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
 """
-usage: seq_from_fasta.py [-h] [-i INFO_FILE] [--flank FLANK] [--unformatted]
-                         [--full_header]
-                         FASTA_file
-                         [sequence_information [sequence_information ...]]
+usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR]
+                         [--unformatted] [-e] [--full_header]
+                         FASTA_file [header strand start stop [label]
+                         [header strand start stop [label] ...]]
 
 Retrieves sequences from a FASTA file using the following format: header
 strand start stop [label]. If >label< is provided, will output in FASTA format
@@ -13,16 +13,22 @@ using >label< as header. Otherwise, outputs one sequence per line. If only
 
 positional arguments:
   FASTA_file            FASTA-formatted text file
-  sequence_information  header strand start stop [label]
+  header strand start stop [label]
+                        header strand start stop [label]
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INFO_FILE, --info_file INFO_FILE
+  -f INFO_FILE, --info_file INFO_FILE
                         file with information for sequences on separate lines.
   --flank FLANK         size of any desired flanking region around specified
                         sequence(s)
+  -s SEPARATOR, --separator SEPARATOR
+                        Character to use to separate flanking sequence (if
+                        any) from main sequence, which defaults to {tab}.
   --unformatted, -u     leave original file formatting intact (e.g. don't join
                         multi-line entries into a single line)
+  -e, --exclude_header  exclude the header line from the output (does not
+                        apply to explicitly labeled queries)
   --full_header         match on full header string (including whitespace)
 
 """
