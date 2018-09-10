@@ -24,7 +24,7 @@ Retrieve a random set of lines from a file (FASTA-format aware)
 ### `reciprologs.py`
 Get the best reciprocal BLAST hits between two files
 
-### `seq_from_fasta.py`
+### `fasta_seq.py`
 Retrieve one or more sequences (or sub-sequences) from a FASTA file
 
 ### `top_blast_hits.py`

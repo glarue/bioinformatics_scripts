@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
 """
-usage: seq_from_fasta.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR]
-                         [-u] [-e] [--full_header]
-                         FASTA_file [header strand start stop [label]
-                         [header strand start stop [label] ...]]
+usage: fasta_seq.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR] [-u]
+                    [-e] [--full_header]
+                    FASTA_file [header strand start stop [label]
+                    [header strand start stop [label] ...]]
 
 Retrieves sequences from a FASTA file using the following format: header
 strand start stop [label]. If >label< is provided, will output in FASTA format
@@ -30,6 +30,7 @@ optional arguments:
   -e, --exclude_header  exclude the header line from the output (does not
                         apply to explicitly labeled queries)
   --full_header         match on full header string (including whitespace)
+
 
 """
 import sys

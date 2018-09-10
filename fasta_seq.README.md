@@ -1,4 +1,4 @@
-# __seq_from_fasta.py__
+# __fasta_seq.py__
 
 ## __[tl;dr]__
 
@@ -6,11 +6,11 @@ Retrieves one or more sub-sequences from a FASTA file based on location, coordin
 
 ## __[details]__
 
-`seq_from_fasta.py` allows for the extraction of either header/sequence pairs in their entirety or sub-sequences thereof from a FASTA file. In a large genome FASTA, one might wish to isolate the sequence for scaffold42. This could of course be done using `grep -A 1 'scaffold42'`, unless (as is unfortunately often the case) the formatting of the file did not place the entire sequence on a single line.
+`fasta_seq.py` allows for the extraction of either header/sequence pairs in their entirety or sub-sequences thereof from a FASTA file. In a large genome FASTA, one might wish to isolate the sequence for scaffold42. This could of course be done using `grep -A 1 'scaffold42'`, unless (as is unfortunately often the case) the formatting of the file did not place the entire sequence on a single line.
 
 If, however, one were interested in a single exon's sequence, such an operation proves more difficult with basic command-line tools, as it involves parsing a sub-sequence from within the parent sequence using positional information.
 
-In order to pull a header/sequence pair, `seq_from_fasta.py` requires only the header name; to retrieve sub-sequences, the minimal set of information required in addition to the FASTA file is (in order): `header strand start stop`
+In order to pull a header/sequence pair, `fasta_seq.py` requires only the header name; to retrieve sub-sequences, the minimal set of information required in addition to the FASTA file is (in order): `header strand start stop`
 
 ## __[example usage]__
 
@@ -40,15 +40,15 @@ Note the variable formatting. The first entry has a single 80 character sequence
 To pull out the sequence for header `one`, the syntax is simply
 
 ```
-$ seq_from_fasta.py dummy.fasta one
+$ fasta_seq.py dummy.fasta one
 >one
 11111111111111111111111111111111111111111111111111111111111111111111111111111111
 ```
 
-For headers that have sequences across multiple lines, `seq_from_fasta.py` will output the sequence in a single line by default:
+For headers that have sequences across multiple lines, `fasta_seq.py` will output the sequence in a single line by default:
 
 ```
-$ seq_from_fasta.py dummy.fasta three
+$ fasta_seq.py dummy.fasta three
 >three
 333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333
 ```
@@ -56,7 +56,7 @@ $ seq_from_fasta.py dummy.fasta three
 Use `-u` to maintain the original formatting during output:
 
 ```
-$ seq_from_fasta.py dummy.fasta three -u
+$ fasta_seq.py dummy.fasta three -u
 >three
 33333333333333333333333333333333333333333333333333333333333333333333333333333333
 33333333333333333333333333333333333333333333333333333333333333333333333333333333
@@ -74,7 +74,7 @@ Note that the coordinate values are _inclusive_, and 1-indexed (as is standard i
 To get the sub-sequence `4567` from header `one-to-nine` in our dummy FASTA:
 
 ```
-$ seq_from_fasta.py dummy.fasta one-to-nine + 4 7
+$ fasta_seq.py dummy.fasta one-to-nine + 4 7
 4567
 ```
 
@@ -86,10 +86,10 @@ two + 1 3
 one-to-nine + 1 3
 ```
 
-and run `seq_from_fasta.py` on the file using the `-f` flag:
+and run `fasta_seq.py` on the file using the `-f` flag:
 
 ```
-$ seq_from_fasta.py dummy.fasta -f seqinfo.txt 
+$ fasta_seq.py dummy.fasta -f seqinfo.txt 
 222
 123
 ```
