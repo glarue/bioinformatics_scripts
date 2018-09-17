@@ -161,14 +161,17 @@ def is_better(challenger, defender, seq_lengths=None):
             return challenger, 'e-value'
         elif seq_lengths is not None:
             # criteria --> length
-            # if scores are equal, check if sequence lenths
+            # if scores are equal, check if sequence lengths
             # have been provided as an additional tiebreaking
             # criteria and look up the subject length to
             # see if there's a difference
             dn = defender['name']
             cn = challenger['name']
-            if seq_lengths[cn] > seq_lengths[dn]:
-                return challenger, 'length'
+            try:
+                if seq_lengths[cn] > seq_lengths[dn]:
+                    return challenger, 'length'
+            except KeyError:
+                return False
         else:
             return False
     else:
@@ -272,38 +275,6 @@ def concatenate(outname, file_list, clean=True):
         [os.remove(fn) for fn in file_list]
 
 
-def make_ortho_dict(*orthos):
-    """
-    IN:
-    [
-        [('a', 'b'), ('a', 'c'), ('a', 'd')],
-        [('b', 'c'), ('b', 'e'), ('b', 'f')],
-        [('c', 'e'), ('c', 'f'), ('c', 'g')],
-        [('z', 'x'), ('z', 'y'), ('z', 'w')]
-    ]
-    OUT:
-    defaultdict(set,
-            {'a': {'b', 'c', 'd'},
-             'b': {'a', 'c', 'e', 'f'},
-             'c': {'a', 'b', 'e', 'f', 'g'},
-             'd': {'a'},
-             'e': {'b', 'c'},
-             'f': {'b', 'c'},
-             'g': {'c'},
-             'w': {'z'},
-             'x': {'z'},
-             'y': {'z'},
-             'z': {'w', 'x', 'y'}})
-    
-    """
-    collector = defaultdict(set)
-    for o_list in orthos:
-        for pair in o_list:
-            for a, b in permutations(pair, 2):
-                collector[a].add(b)
-    return collector
-
-
 def aggregate_dict_chained(ortho_dict):
     """
     IN:
@@ -341,6 +312,7 @@ def aggregate_dict_chained(ortho_dict):
             master[k].update(ortho_dict[v2])
     if changed is True:
         master = aggregate_dict_chained(master)
+
     return master
 
 
@@ -367,43 +339,6 @@ def aggregate_orthos_chained(orthos):
     return sorted(ortho_groups)
 
 
-def every_member_match(members, m_dict):
-    all_match = True
-    for m in members:
-        others = [e for e in members if e != m]
-        if not others:
-            return True
-        for o in others:
-            if m not in m_dict[o]:
-                return False
-            
-    return all_match
-
-    
-def all_by_all_orthos(ortho_dict):
-    full_groups = {}
-    for k, v in ortho_dict.items():
-        groups = []
-        max_n = len(v)
-        # special case where there is only one element to compare against
-        if max_n == 1:
-            if every_member_match(v, ortho_dict):
-                groups.append(tuple(v))
-        for i in range(2, max_n + 1):
-            for g in combinations(v, i):
-                if every_member_match(g, ortho_dict):
-                    groups.append(g)
-        full_groups[k] = groups
-        
-    all_sets = set()
-    for k, group_list in full_groups.items():
-        for g in group_list:
-            full_group = sorted(set(list(g) + [k]))
-            all_sets.add(tuple(full_group))
-    
-    return sorted(all_sets)
-
-
 def aggregate_orthos_strict(orthos):
     """
     IN:
@@ -428,8 +363,81 @@ def aggregate_orthos_strict(orthos):
     """
     o_dict = make_ortho_dict(*orthos)
     aggregated = all_by_all_orthos(o_dict)
-    
+
     return aggregated
+
+
+def all_by_all_orthos(ortho_dict):
+    full_groups = {}
+    for k, v in ortho_dict.items():
+        groups = []
+        max_n = len(v)
+        # special case where there is only one element to compare against
+        if max_n == 1:
+            if every_member_match(v, ortho_dict):
+                groups.append(tuple(v))
+        for i in range(2, max_n + 1):
+            for g in combinations(v, i):
+                if every_member_match(g, ortho_dict):
+                    groups.append(g)
+        full_groups[k] = groups
+        
+    all_sets = []
+
+    for k, group_list in sorted(full_groups.items()):
+        for g in sorted(group_list, key=len, reverse=True):
+            full_group = set(list(g) + [k])
+            if any(og.issuperset(full_group) for og in all_sets):
+                continue
+            all_sets.append(full_group)
+    
+    return sorted([sorted(s) for s in all_sets])
+
+
+def every_member_match(members, m_dict):
+    all_match = True
+    for m in members:
+        others = [e for e in members if e != m]
+        if not others:
+            return True
+        if any(m not in m_dict[o] for o in others):
+            return False
+            
+    return all_match
+
+
+def make_ortho_dict(*orthos):
+    """
+    IN:
+    [
+        [('a', 'b'), ('a', 'c'), ('a', 'd')],
+        [('b', 'c'), ('b', 'e'), ('b', 'f')],
+        [('c', 'e'), ('c', 'f'), ('c', 'g')],
+        [('z', 'x'), ('z', 'y'), ('z', 'w')]
+    ]
+    OUT:
+    defaultdict(set,
+            {'a': {'b', 'c', 'd'},
+             'b': {'a', 'c', 'e', 'f'},
+             'c': {'a', 'b', 'e', 'f', 'g'},
+             'd': {'a'},
+             'e': {'b', 'c'},
+             'f': {'b', 'c'},
+             'g': {'c'},
+             'w': {'z'},
+             'x': {'z'},
+             'y': {'z'},
+             'z': {'w', 'x', 'y'}})
+    
+    """
+    collector = defaultdict(set)
+    for o_list in orthos:
+        for pair in o_list:
+            for a, b in permutations(pair, 2):
+                collector[a].add(b)
+
+    return collector
+
 
 def names_from_blastfile(blast_fn):
     file_pattern = r'(.+)-vs-(.+)\.t?blast[npx]'
@@ -481,7 +489,13 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
         #     fw_fn, PARALOGS, query_match=qm_q)
     else:
         if not os.path.isfile(rv_fn) or OVERWRITE:
-            reverse_args = [BLAST, subject, query, blast_type, '-o', rv_fn] + extra
+            reverse_args = [
+                BLAST, 
+                subject, 
+                query, 
+                blast_type, 
+                '-o', 
+                rv_fn] + extra
             subprocess.run(reverse_args)    
         else:
             print('[#] Using existing BLAST output \'{}\''.format(rv_fn))
@@ -496,6 +510,7 @@ def pair_reciprologs(query, subject, blast_type, qp, extra):
     win_ledger = {**fw_win_ledger, **rv_win_ledger}
 
     return reciprocal_hits, win_ledger
+
 
 def remove_many_to_one(pairs):
     """
@@ -530,6 +545,7 @@ def remove_many_to_one(pairs):
             filtered.append(p)
 
     return filtered
+
 
 parser = argparse.ArgumentParser(
     description=(
