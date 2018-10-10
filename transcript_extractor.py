@@ -4,7 +4,8 @@
 # the above sources Python from $PATH
 
 """
-usage: transcript_extractor.py [-h] [-t] [-e] [-i] [-c] [-v] genome annotation
+usage: transcript_extractor.py [-h] [-t] [-e] [-i] [-c] [-v] [-n]
+                               genome annotation
 
 Extract transcript/coding sequences from a genome using an annotation file
 
@@ -21,11 +22,14 @@ optional arguments:
                         longest (default: False)
   -c, --coord_based_isoforms
                         detect isoforms by overlapping coordindates in
-                        addition to shared parent (useful for annotations 
+                        addition to shared parent (useful for annotations
                         without gene entries) (default: False)
   -v, --verbose_headers
                         include coordinate info in output headers (default:
                         False)
+  -n, --non_coding      include non-coding (intronic, UTR, etc.) sequence; uses
+                        only the coordinates of the transcript itself
+                        (default: False)
 
 """
 
@@ -580,14 +584,17 @@ def get_coding_seq(seq, coord_list):
     return full_seq
 
 
-def format_output(region_seq, t_dict, verbose=False):
+def format_output(region_seq, t_dict, non_coding=False, verbose=False):
     t_info = t_dict['info']
     t_name = t_info['name']
     strand = t_info['strand']
     region = t_info['region']
     span = ':'.join(map(str, t_info['coords']))
     # length = str(t_info['length'])
-    seq_coords = t_dict['children']
+    if non_coding is True:
+        seq_coords = [t_info['coords']]
+    else:
+        seq_coords = t_dict['children']
     seq = get_coding_seq(region_seq, seq_coords)
     if strand == '-':
         seq = reverse_complement(seq)
@@ -669,6 +676,14 @@ parser.add_argument(
     action='store_true',
     help='include coordinate info in output headers'
 )
+parser.add_argument(
+    '-n',
+    '--non_coding',
+    action='store_true',
+    help=(
+        'include non-coding (intronic, UTR, etc.) sequence; uses only the '
+        'coordinates of the transcript itself')
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -684,6 +699,7 @@ EXON_DEF = args.exon
 VERBOSE = args.verbose_headers
 ISOFORMS = args.isoforms
 FILTER_BY_COORDS = args.coord_based_isoforms
+NON_CODING = args.non_coding
 
 if EXON_DEF:
     child_type = 'exon'
@@ -718,7 +734,9 @@ for region, region_seq in fasta_parse(GENOME):
     for t_name, t_dict in sorted(region_dict.items()):
         if not t_dict['children']:
             continue
-        print(format_output(region_seq, t_dict, verbose=VERBOSE), flush=True)
+        print(format_output(
+            region_seq, t_dict, non_coding=NON_CODING, verbose=VERBOSE), 
+            flush=True)
         seq_count += 1
     total_regions -= 1
     if total_regions == 0:  # don't keep looping if we're done
@@ -726,6 +744,7 @@ for region, region_seq in fasta_parse(GENOME):
 
 runtime = get_runtime(start)
 
-print('[#] Extracted {} coding sequences in {}'.format(seq_count, runtime), file=sys.stderr)
+print('[#] Extracted {} coding sequences in {}'.format(
+        seq_count, runtime), file=sys.stderr)
 
 sys.exit(0)
