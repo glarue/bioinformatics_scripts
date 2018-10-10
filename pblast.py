@@ -462,6 +462,7 @@ parser.add_argument(
     default=1e-10
 )
 parser.add_argument(
+    '-naf',
     '--no_auto_format',
     help='disable helper operations that auto-format subject/query as needed '
     'and build BLAST database if not already present',
