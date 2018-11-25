@@ -68,6 +68,7 @@ def get_subseq(parent_seq, start, stop, flank=0):
     if max_right_flank <= flank:
         r_flank = max_right_flank
     out_string = parent_seq[start-l_flank:stop+r_flank]
+
     return out_string, l_flank, r_flank
 
 
@@ -82,17 +83,33 @@ def line_from_args(args):
 
 def line_to_info(line):
     bits = line.strip().split()
-    loc, strand, start, stop = bits[:4]
-    start, stop = min(int(start), int(stop)), max(int(start), int(stop))
+    try:
+        strand = next(b for b in bits if b in ('+', '-'))
+    except StopIteration:
+        strand = '.'
+    loc = bits[0]
+    coords = list(map(int, [b for b in bits[1:4] if b.isdigit()]))
+    start = min(coords)
+    stop = max(coords)
+    # start, stop = min(int(start), int(stop)), max(int(start), int(stop))
     if len(bits) > 4:
+        try:
+            label = next(
+                b for b in bits 
+                if b not in [loc, strand, str(start), str(stop), '.']
+            )
+        except StopIteration:
+            label = None
+    elif len(bits) == 4:
         label = bits[-1]
     else:
         label = None
     line_info = {"loc": loc,
                  "strand": strand,
-                 "start": int(start),
-                 "stop": int(stop),
+                 "start": start,
+                 "stop": stop,
                  "label": label}
+
     return line_info
 
 
@@ -104,6 +121,7 @@ def seq_from_line(parent_seq, line):
         seq = rev_comp(seq)
     if FLANK:
         seq = demarcate(seq, l_flank, r_flank, separator=FLANK_SEPARATOR)
+
     return seq
 
 
@@ -207,6 +225,15 @@ parser.add_argument(
     action='store_true',
     help='match on full header string (including whitespace)'
 )
+parser.add_argument(
+    '-t',
+    '--truncate',
+    help=(
+        'truncate sequence to >length< * 2 (from both ends); e.g. -t 50 --> '
+        'total length of 100'),
+    type=int,
+    default=None
+)
 
 args = parser.parse_args()
 
@@ -214,6 +241,7 @@ FASTA = args.FASTA_file
 FLANK = args.flank
 FLANK_SEPARATOR = decode(args.separator, 'unicode escape')
 EXCLUDE_HEADER = args.exclude_header
+TRUNCATE = args.truncate
 
 if args.full_header:
     TRIM = False
@@ -231,7 +259,7 @@ if args.info_file:
     info_dict = info_from_file(list_file)
 else:
     info_length = len(args.sequence_information)
-    if 2 <= info_length < 4:
+    if 2 <= info_length < 4 or info_length == 0:
         sys.exit('Insufficient sequence information provided. Exiting.')
     direct_args = args.sequence_information
     info_dict = info_from_args(direct_args)
@@ -239,6 +267,14 @@ else:
 FASTA = flex_open(FASTA)
 
 for seq, seq_info in seqs_from_fasta(FASTA, info_dict, EXCLUDE_HEADER):
+    if TRUNCATE:
+        bits = []
+        if FLANK:
+            up, seq, down = seq.split(FLANK_SEPARATOR)
+        if len(seq) > TRUNCATE * 2:
+            seq = seq[:TRUNCATE] + seq[-TRUNCATE:]
+        if FLANK:
+            seq = FLANK_SEPARATOR.join([up, seq, down])
     if seq_info["label"]:
         print(">{}".format(seq_info["label"]))
     print(seq)
