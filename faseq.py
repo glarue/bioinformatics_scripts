@@ -1,10 +1,10 @@
 #!/usr/bin/python3
 
 """
-usage: fasta_seq.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR] [-u]
-                    [-e] [--full_header]
-                    FASTA_file [header strand start stop [label]
-                    [header strand start stop [label] ...]]
+usage: faseq.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR] [-u]
+                [-e] [--full_header]
+                FASTA_file [header strand start stop [label]
+                [header strand start stop [label] ...]]
 
 Retrieves sequences from a FASTA file using the following format: header
 strand start stop [label]. If >label< is provided, will output in FASTA format
@@ -92,18 +92,20 @@ def line_to_info(line):
     start = min(coords)
     stop = max(coords)
     # start, stop = min(int(start), int(stop)), max(int(start), int(stop))
-    if len(bits) > 4:
+    label = '\t'.join(bits)
+    if len(bits) > 5:
         try:
             label = next(
                 b for b in bits 
                 if b not in [loc, strand, str(start), str(stop), '.']
             )
         except StopIteration:
-            label = None
-    elif len(bits) == 4:
+            pass
+            # label = None
+    elif len(bits) == 5:
         label = bits[-1]
-    else:
-        label = None
+    # else:
+        # label = None
     line_info = {"loc": loc,
                  "strand": strand,
                  "start": start,
@@ -130,7 +132,7 @@ def info_from_file(list_file):
     with open(list_file) as f:
         for l in f:
             l = l.strip()
-            loc = l.split()[0]
+            loc = l.split('\t')[0]
             if loc not in records:
                 records[loc] = []
             records[loc].append(l)
