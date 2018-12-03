@@ -24,13 +24,13 @@ Retrieve a random set of lines from a file (FASTA-format aware)
 ### `reciprologs.py`
 Get the best reciprocal BLAST hits between two files
 
-### `fasta_seq.py`
+### `faseq.py`
 Retrieve one or more sequences (or sub-sequences) from a FASTA file
 
 ### `top_blast_hits.py`
 Get only the top N hits for each query from a BLAST tabular output file
 
-### `transcript_extractor.py`
+### `cdseq.py`
 Retrieve the coding sequences (defined by either CDS or exon entries) using a genome and annotation file
 
 ### `translator.py`
