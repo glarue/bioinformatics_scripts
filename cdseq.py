@@ -4,7 +4,7 @@
 # the above sources Python from $PATH
 
 """
-usage: transcript_extractor.py [-h] [-t] [-e] [-i] [-c] [-v] [-n]
+usage: cdseq.py [-h] [-t] [-e] [-i] [-c] [-v] [-n]
                                genome annotation
 
 Extract transcript/coding sequences from a genome using an annotation file
