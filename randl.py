@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: random_lines.py [-h] file n
+usage: randl.py [-h] file n
 
 Retrieves a random sample of lines from a file.
 
