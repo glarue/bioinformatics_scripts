@@ -95,10 +95,10 @@ def line_to_info(line):
     label = '\t'.join(bits)
     if len(bits) > 5:
         try:
-            label = next(
+            label = ' '.join([
                 b for b in bits 
                 if b not in [loc, strand, str(start), str(stop), '.']
-            )
+            ])
         except StopIteration:
             pass
             # label = None
