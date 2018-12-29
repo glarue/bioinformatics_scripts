@@ -1,37 +1,36 @@
 # General-use bioinformatics scripts
 
-These scripts are relatively mature and well-documented, and should be useful
-to a somewhat wider audience than just their author.
+These Pytyon scripts are relatively mature and well-documented, and may be useful to a somewhat wider audience than their author.
 
-### `cli_mail.py`
+### `climail`
 Send email over SSL from the command line
 
-### `cmdlog.py`
+### `cmdlog`
 Keep a log of commands used and the files they produce
 
-### `fasterq_dump.py`
+### `fasterq_dump`
 Run NCBI's `fastq-dump` on one or more accession numbers faster than normal
 
-### `notify.py`
+### `notify`
 Automatically send an email to yourself at the end of a (usually long-running) command
 
-### `pblast.py`
+### `pblast`
 A parallel implementation of NCBI's BLAST+ suite (faster than their threading implementation for certain db/query size combinations)
 
-### `random_lines.py`
+### `randl`
 Retrieve a random set of lines from a file (FASTA-format aware)
 
-### `reciprologs.py`
+### `reciprologs`
 Get the best reciprocal BLAST hits between two files
 
-### `faseq.py`
+### `faseq`
 Retrieve one or more sequences (or sub-sequences) from a FASTA file
 
-### `top_blast_hits.py`
+### `tophits`
 Get only the top N hits for each query from a BLAST tabular output file
 
-### `cdseq.py`
+### `cdseq`
 Retrieve the coding sequences (defined by either CDS or exon entries) using a genome and annotation file
 
-### `translator.py`
+### `transeq`
 Translate nucleotide sequence(s) into amino acid sequences
