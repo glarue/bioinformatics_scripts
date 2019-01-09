@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-usage: notify.py [-h] [-e EMAIL] [--add_email] [--view_config] [--ID ID]
-                 [external commands [external commands ...]]
+usage: notify [-h] [-e EMAIL] [--add_email] [--view_config] [--ID ID]
+              [external commands [external commands ...]]
 
 Automatically sends an email to the specified address upon completion of the
 specified command. Useful primarily for very long-running processes. In many
@@ -341,7 +341,7 @@ if len(sys.argv) == 1:
 
 SCRIPT_HOME = os.path.dirname(os.path.realpath(sys.argv[0]))
 HOME_DIR = os.path.expanduser('~')
-CONFIG = os.path.join(HOME_DIR, '.notify.py.config')
+CONFIG = os.path.join(HOME_DIR, '.notify.config')
 if not os.path.isfile(CONFIG):
     open(CONFIG, 'w').close()  # hacky!
 
@@ -424,6 +424,6 @@ send_args = {
 
 send_ssl_mail(**send_args)
 
-print('[#] notify.py: command completed in {}'.format(run_time), file=sys.stderr)
+print('[#] notify: command completed in {}'.format(run_time), file=sys.stderr)
 
 sys.exit(0)
