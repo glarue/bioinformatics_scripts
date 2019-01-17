@@ -1,15 +1,15 @@
 #!/usr/bin/python3
 
 """
-usage: faseq.py [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR] [-u]
-                [-e] [--full_header]
-                FASTA_file [header strand start stop [label]
-                [header strand start stop [label] ...]]
+usage: faseq [-h] [-f INFO_FILE] [--flank FLANK] [-s SEPARATOR] [-u] [-e]
+             [--full_header] [-t integer]
+             FASTA_file [header strand start stop [label]
+             [header strand start stop [label] ...]]
 
 Retrieves sequences from a FASTA file using the following format: header
-strand start stop [label]. If >label< is provided, will output in FASTA format
-using >label< as header. Otherwise, outputs one sequence per line. If only
->header< is provided, will return the entire header/sequence pair.
+strand start stop [label]. If {label} is provided, will output in FASTA format
+using {label} as header. Otherwise, outputs one sequence per line. If only
+{header} is provided, will return the entire header/sequence pair.
 
 positional arguments:
   FASTA_file            FASTA-formatted text file
@@ -30,8 +30,9 @@ optional arguments:
   -e, --exclude_header  exclude the header line from the output (does not
                         apply to explicitly labeled queries)
   --full_header         match on full header string (including whitespace)
-
-
+  -t integer, --truncate integer
+                        truncate sequence to {integer} * 2 (from both ends);
+                        e.g. -t 50 --> total length of 100
 """
 import sys
 import argparse
@@ -174,9 +175,9 @@ def seqs_from_fasta(fasta, line_dict, exclude_header=False):
 parser = argparse.ArgumentParser(
     description=(
         'Retrieves sequences from a FASTA file using the following '
-        'format: header strand start stop [label]. If >label< is provided, '
-        'will output in FASTA format using >label< as header. Otherwise, '
-        'outputs one sequence per line. If only >header< is provided, will '
+        'format: header strand start stop [label]. If {label} is provided, '
+        'will output in FASTA format using {label} as header. Otherwise, '
+        'outputs one sequence per line. If only {header} is provided, will '
         'return the entire header/sequence pair.')
 )
 parser.add_argument(
@@ -231,9 +232,10 @@ parser.add_argument(
     '-t',
     '--truncate',
     help=(
-        'truncate sequence to >length< * 2 (from both ends); e.g. -t 50 --> '
+        'truncate sequence to {integer} * 2 (from both ends); e.g. -t 50 --> '
         'total length of 100'),
     type=int,
+    metavar='integer',
     default=None
 )
 
