@@ -38,6 +38,7 @@ import argparse
 from collections import defaultdict
 from operator import itemgetter
 import time
+from math import floor
 try:
     from biogl import flex_open as open_func
 except ModuleNotFoundError:
@@ -214,6 +215,12 @@ class GFFLineInfo(object):
         Retrieves parent information from an annotation line.
 
         """
+        # do it the easy way first
+        infostring = self.infostring
+        match = self.__field_match(infostring, ["Parent="], delimiter)
+        if match:
+            return match
+
         feat_type_converter = {"cds": "exon", "mrna": "transcript"}
         feat_type = self.feat_type
         if feat_type in feat_type_converter:
@@ -232,8 +239,8 @@ class GFFLineInfo(object):
         try:
             tags = tag_selector[feat_type]
         except KeyError:
-            tags = list(set(child_tags + transcript_tags))
-        infostring = self.infostring
+            # tags = list(set(child_tags + transcript_tags))
+            tags = child_tags + transcript_tags
         match = self.__field_match(infostring, tags, delimiter, tag_order=True)
         if not match and feat_type == "transcript":
             match = self.get_ID()
@@ -241,25 +248,44 @@ class GFFLineInfo(object):
         return match
 
 
-def reverse_complement(seq):
+def reverse_complement(seq, use_lower=True):
     """
-    Returns reverse complement of seq, with
+    Returns reverse complement of {seq}, with
     any non-ACTG characters replaced with Ns
 
     """
-    transform = {'A': 'T',
-                 'T': 'A',
-                 'C': 'G',
-                 'G': 'C',
-                 'N': 'N'}
+    transform = {
+        'A': 'T',
+        'T': 'A',
+        'C': 'G',
+        'G': 'C',
+        'N': 'N'
+    }
+    transform_mixed = {
+        'A': 'T',
+        'T': 'A',
+        'C': 'G',
+        'G': 'C',
+        'N': 'N',
+        'a': 't',
+        't': 'a',
+        'c': 'g',
+        'g': 'c',
+        'n': 'n'
+    }
+    if use_lower is True:
+        mapper = transform_mixed
+    else:
+        mapper = transform
     try:
-        comp = [transform[e] for e in seq]
+        comp = [mapper[e] for e in seq]
     except KeyError:  # non-ATCGN characters in seq
-        seq = [e if e in "ACTGN" else "N" for e in seq]
-        comp = [transform[e] for e in seq]
-    rev_comp = comp[::-1]
-    rev_comp_string = ''.join(rev_comp)
-    return rev_comp_string
+        seq = [e if e in "ACTGNactgn" else "X" for e in seq]
+        comp = [mapper[e] for e in seq]
+    reverse_comp = comp[::-1]
+    reverse_comp_string = ''.join(reverse_comp)
+
+    return reverse_comp_string
 
 
 def get_subseq(region_seq, start, stop):
@@ -575,16 +601,43 @@ def coding_length(coords):
     return sum([abs(stop-start) + 1 for start, stop in coords])
 
 
-def get_coding_seq(seq, coord_list):
+# def get_coding_seq(seq, coord_list):
+#     seq_list = []
+#     for coord in sorted(coord_list):
+#         seq_list.append(get_subseq(seq, *coord))
+#     full_seq = ''.join(seq_list)
+
+#     return full_seq
+
+
+def get_coding_seq(seq, coord_list, introns=False):
+    coord_list = sorted(coord_list)
+    coord_list = [(c, 'exon') for c in coord_list]    
+    if introns is not False:
+        i_starts = [c[1] + 1 for c, _ in coord_list[:-1]]
+        i_stops = [c[0] - 1 for c, _ in coord_list[1:]]
+        i_tags = ['intron'] * len(i_starts)
+        intron_coords = list(zip(zip(i_starts, i_stops), i_tags))
+        coord_list.extend(intron_coords)
     seq_list = []
-    for coord in sorted(coord_list):
-        seq_list.append(get_subseq(seq, *coord))
+    for coord, tag in sorted(coord_list):
+        chunk = get_subseq(seq, *coord)
+        if tag == 'intron':
+            chunk = chunk.lower()
+            if INTRON_LENGTH and len(chunk) > INTRON_LENGTH:
+                chunk = chunk[:HALF_LENGTH] + chunk[-HALF_LENGTH:]
+        seq_list.append(chunk)
     full_seq = ''.join(seq_list)
 
     return full_seq
 
 
-def format_output(region_seq, t_dict, non_coding=False, verbose=False):
+def format_output(
+    region_seq, 
+    t_dict, 
+    non_coding=False, 
+    introns=False, 
+    verbose=False):
     t_info = t_dict['info']
     t_name = t_info['name']
     strand = t_info['strand']
@@ -595,7 +648,7 @@ def format_output(region_seq, t_dict, non_coding=False, verbose=False):
         seq_coords = [t_info['coords']]
     else:
         seq_coords = t_dict['children']
-    seq = get_coding_seq(region_seq, seq_coords)
+    seq = get_coding_seq(region_seq, seq_coords, introns=introns)
     if strand == '-':
         seq = reverse_complement(seq)
     if TRANSLATE is True:
@@ -684,6 +737,20 @@ parser.add_argument(
         'include non-coding (intronic, UTR, etc.) sequence; uses only the '
         'coordinates of the transcript itself')
 )
+parser.add_argument(
+    '--introns',
+    action='store_true',
+    help=(
+        'include intron sequences in lowercase (incompatible with -n)')
+)
+parser.add_argument(
+    '--truncate_introns',
+    type=int,
+    metavar='int_length',
+    help=(
+        'truncate intron sequences to length {int_length} (or length -1 if odd)'
+    )
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -700,6 +767,16 @@ VERBOSE = args.verbose_headers
 ISOFORMS = args.isoforms
 FILTER_BY_COORDS = args.coord_based_isoforms
 NON_CODING = args.non_coding
+INTRONS = args.introns
+INTRON_LENGTH = args.truncate_introns
+
+if INTRONS and INTRON_LENGTH is not None:
+    HALF_LENGTH = floor(INTRON_LENGTH / 2)
+else:
+    HALF_LENGTH = None
+
+if NON_CODING and INTRONS:
+    sys.exit('Choose either -n or --introns, but not both')
 
 if EXON_DEF:
     child_type = 'exon'
@@ -735,7 +812,11 @@ for region, region_seq in fasta_parse(GENOME):
         if not t_dict['children']:
             continue
         print(format_output(
-            region_seq, t_dict, non_coding=NON_CODING, verbose=VERBOSE), 
+            region_seq, 
+            t_dict, 
+            non_coding=NON_CODING, 
+            introns=INTRONS, 
+            verbose=VERBOSE), 
             flush=True)
         seq_count += 1
     total_regions -= 1
