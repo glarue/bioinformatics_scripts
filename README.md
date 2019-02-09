@@ -2,6 +2,8 @@
 
 These Pytyon scripts are relatively mature and well-documented, and may be useful to a somewhat wider audience than their author.
 
+__Note:__ Some scripts may require the [biogl](https://github.com/glarue/biogl) module to function properly
+
 ### `climail`
 Send email over SSL from the command line
 
