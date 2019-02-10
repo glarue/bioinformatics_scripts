@@ -1,0 +1,3 @@
+[submodule "biogl"]
+	path = biogl
+	url = https://github.com/glarue/biogl
