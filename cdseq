@@ -4,8 +4,9 @@
 # the above sources Python from $PATH
 
 """
-usage: cdseq.py [-h] [-t] [-e] [-i] [-c] [-v] [-n]
-                               genome annotation
+usage: cdseq [-h] [-t] [-e] [-i] [-c] [-v] [-n] [--introns]
+             [--truncate_introns int_length]
+             genome annotation
 
 Extract transcript/coding sequences from a genome using an annotation file
 
@@ -27,265 +28,25 @@ optional arguments:
   -v, --verbose_headers
                         include coordinate info in output headers (default:
                         False)
-  -n, --non_coding      include non-coding (intronic, UTR, etc.) sequence; uses
-                        only the coordinates of the transcript itself
-                        (default: False)
+  -n, --non_coding      include non-coding (intronic, UTR, etc.) sequence;
+                        uses only the coordinates of the transcript itself
+                        (incompatible with --introns) (default: False)
+  --introns             include intron sequences in lowercase (incompatible
+                        with -n) (default: False)
+  --truncate_introns int_length
+                        truncate intron sequences to length {int_length} (or
+                        {int_length} -1 if odd) (default: None)
 
 """
 
 import sys
 import argparse
+import time
 from collections import defaultdict
 from operator import itemgetter
-import time
 from math import floor
-try:
-    from biogl import flex_open as open_func
-except ModuleNotFoundError:
-    open_func = open
-
-class GFFLineInfo(object):
-    """
-    Takes a gff3/gtf/gff annotation line, and returns available metadata
-    about it.
-
-    """
-    def __init__(self, line, line_number):
-        self.bits = self.__split_on_tabs(line)
-        try:
-            self.region = self.bits[0]
-            try:
-                self.start = min(map(int, self.bits[3:5]))
-                self.stop = max(map(int, self.bits[3:5]))
-            except ValueError:
-                self.start = None
-                self.stop = None
-            self.strand = self.bits[6]
-            if self.strand not in ('+', '-'):
-                self.strand = '+'
-            if self.bits[7] in ['0', '1', '2']:
-                self.phase = int(self.bits[7])
-            else:
-                self.phase = None
-            self.infostring = self.bits[8]
-            self.feat_type = self.bits[2].lower()
-            self.parent = self.get_parent()
-            self.grandparent = None
-            # try to get grandparent for child types
-            if self.feat_type in ('cds', 'exon'):
-                self.grandparent = self.__field_match(self.infostring, ['gene_id', 'geneID'], delimiter=';')
-            self.name = self.get_ID()
-            self.line_number = line_number
-        except TypeError:
-            raise
-
-    @staticmethod
-    def __split_on_tabs(l, n=9):
-        """
-        Checks for a valid line (does not start with #).
-
-        Splits valid line on tabs, and returns a list of the bits
-        if the list length is <<n>>. Setting <<n>> to None will return
-        the split line regardless of length.
-
-        """
-        if l.startswith('#'):
-            return None
-        l = l.strip()
-        columns = l.split("\t")
-        if n and len(columns) < n:
-            return None
-        return columns
-
-    @staticmethod
-    def __field_match(infostring, tags, delimiter, tag_order=False):
-        if tag_order:
-            # check for first match of tags in order
-            try:
-                tags = [next(t for t in tags if t.lower() in infostring.lower())]
-            except StopIteration:
-                return None
-        info_bits = infostring.split(delimiter)
-        try:
-            match = next(
-                e for e in info_bits
-                if any(p.lower() in e.lower() for p in tags))
-        except StopIteration:  # no matches found
-            return None
-        if "=" in match:
-            substring = match.split("=")[1]
-        else:
-            substring = match.split()[1]
-        return substring.strip("\"")
-
-
-    def get_type(self, delimiter=';'):
-        """
-        Classifies annotation lines into type categories,
-        taking into account edge cases like 'processed transcript'
-        and 'pseudogenic transcript'.
-
-        """
-        og_type = self.bits[2].lower()
-        if og_type == 'mrna':
-            og_type = 'transcript'
-        if og_type in ('gene', 'transcript', 'exon', 'cds'):
-            return og_type
-
-        disqualifying = ['utr', 'start', 'stop']
-        if any(kw in og_type for kw in disqualifying):
-            return og_type
-
-        # Not an obvious type, so search for features of transcripts
-        # and genes in infostring to try to infer type
-
-        # check for explicit mention of transcript in ID
-        try:
-            id_string = next(
-                (f for f in delimiter.split(self.infostring)
-                if f.startswith("ID")))
-
-            if any(tag in id_string for tag in ('transcript', 'mrna')):
-                return 'transcript'
-        except StopIteration:
-            pass
-
-        gene_tags = ["gene_id", "geneId"]
-        transcript_tags = ["transcriptId", "transcript_ID"]
-        # Transcripts first because genes shouldn't have transcript IDs,
-        # but transcripts may have gene IDs
-        for ftype, tags in zip(
-                ['transcript', 'gene'], [transcript_tags, gene_tags]
-        ):
-            match = self.__field_match(self.infostring, tags, delimiter)
-            if match:
-                return ftype
-            else:
-                return og_type
-
-
-    def get_ID(self, delimiter=";"):
-        """
-        Finds the ID of a given annotation file line.
-
-        """
-        # first, do it the easy way
-        prefix = None
-        infostring = self.infostring
-        match = self.__field_match(infostring, ["ID="], delimiter)
-        if match:
-            return match
-
-        # Constrain feature types to simplify indexing
-        feat_type = self.feat_type
-        if feat_type == "mrna":
-            feat_type = "transcript"
-        # all get lowercased in the comparison
-        # if is no 'ID=', should reference self via others
-        gene_tags = ["ID=", "gene_id", "geneId"]
-        transcript_tags = ["ID=", "transcriptId", "transcript_ID"]
-        tag_selector = {
-            "gene": gene_tags,
-            "transcript": transcript_tags
-        }
-        try:
-            tags = tag_selector[feat_type]
-        except KeyError:
-            # get any ID available, prepended with the feature type
-            # to keep different features of the same transcript unique
-            prefix = self.feat_type
-            tags = ['transcriptID', 'transcript_ID', 'gene_ID', 'geneID']
-
-        match = self.__field_match(
-            infostring, tags, delimiter, tag_order=True)
-
-        # if nothing matches, return infostring if there's only
-        # one tag in it (common for gtf parent features)
-        if match is None and infostring.count(";") < 2:
-            match = infostring.split(";")[0]
-
-        if prefix:
-            match = '{}_{}'.format(prefix, match)
-
-        return match
-
-
-    def get_parent(self, delimiter=";"):
-        """
-        Retrieves parent information from an annotation line.
-
-        """
-        # do it the easy way first
-        infostring = self.infostring
-        match = self.__field_match(infostring, ["Parent="], delimiter)
-        if match:
-            return match
-
-        feat_type_converter = {"cds": "exon", "mrna": "transcript"}
-        feat_type = self.feat_type
-        if feat_type in feat_type_converter:
-            feat_type = feat_type_converter[feat_type]
-        child_tags = [
-            "Parent=", "transcript_ID",
-            "transcriptId", "proteinId", "protein_ID"
-        ]
-        transcript_tags = ["Parent=", "gene_ID", "geneId"]
-        gene_tags = ["Parent="]
-        tag_selector = {
-            "gene": gene_tags,
-            "transcript": transcript_tags,
-            "exon": child_tags
-        }
-        try:
-            tags = tag_selector[feat_type]
-        except KeyError:
-            # tags = list(set(child_tags + transcript_tags))
-            tags = child_tags + transcript_tags
-        match = self.__field_match(infostring, tags, delimiter, tag_order=True)
-        if not match and feat_type == "transcript":
-            match = self.get_ID()
-
-        return match
-
-
-def reverse_complement(seq, use_lower=True):
-    """
-    Returns reverse complement of {seq}, with
-    any non-ACTG characters replaced with Ns
-
-    """
-    transform = {
-        'A': 'T',
-        'T': 'A',
-        'C': 'G',
-        'G': 'C',
-        'N': 'N'
-    }
-    transform_mixed = {
-        'A': 'T',
-        'T': 'A',
-        'C': 'G',
-        'G': 'C',
-        'N': 'N',
-        'a': 't',
-        't': 'a',
-        'c': 'g',
-        'g': 'c',
-        'n': 'n'
-    }
-    if use_lower is True:
-        mapper = transform_mixed
-    else:
-        mapper = transform
-    try:
-        comp = [mapper[e] for e in seq]
-    except KeyError:  # non-ATCGN characters in seq
-        seq = [e if e in "ACTGNactgn" else "X" for e in seq]
-        comp = [mapper[e] for e in seq]
-    reverse_comp = comp[::-1]
-    reverse_comp_string = ''.join(reverse_comp)
-
-    return reverse_comp_string
+from biogl import (
+    GxfParse, flex_open,fasta_parse, translate, rev_comp, get_runtime)
 
 
 def get_subseq(region_seq, start, stop):
@@ -297,137 +58,6 @@ def get_subseq(region_seq, start, stop):
     return seq
 
 
-def fasta_parse(fasta, delimiter=">", separator="", trim_header=True):
-    """
-    Iterator which takes FASTA as input. Yields
-    header/value pairs. Separator will be
-    used to join the return value; use separator=
-    None to return a list.
-
-    If trim_header, parser will return the
-    FASTA header up to the first space character.
-    Otherwise, it will return the full, unaltered
-    header string.
-
-    """
-    header, seq = None, []
-    with open_func(fasta) as f:
-        for line in f:
-            if line.startswith(delimiter):
-                if header:  # associate accumulated seq with header
-                    if separator is not None:
-                        seq = separator.join(str(e) for e in seq)
-                    yield header, seq
-                # Assign a new header
-                header = line.strip().lstrip(delimiter)
-                if trim_header:
-                    header = header.split()[0]
-                # Clear seq for new round of collection
-                seq = []
-            elif line.startswith('#'):
-                continue
-            else:
-                if line.strip():  # don't collect blank lines
-                    seq.append(line.rstrip('\n'))
-        if separator is not None:  # make string
-            seq = separator.join(str(e) for e in seq)
-        yield header, seq
-
-
-def translate_seq(
-    string, 
-    verbosity="single", 
-    phase=0,
-    codonMap={
-        'AAA': ('K', 'Lys', 'Lysine'),
-        'AAC': ('N', 'Asn', 'Asparagine'),
-        'AAG': ('K', 'Lys', 'Lysine'),
-        'AAT': ('N', 'Asn', 'Asparagine'),
-        'ACA': ('T', 'Thr', 'Threonine'),
-        'ACC': ('T', 'Thr', 'Threonine'),
-        'ACG': ('T', 'Thr', 'Threonine'),
-        'ACT': ('T', 'Thr', 'Threonine'),
-        'AGA': ('R', 'Arg', 'Arginine'),
-        'AGC': ('S', 'Ser', 'Serine'),
-        'AGG': ('R', 'Arg', 'Arginine'),
-        'AGT': ('S', 'Ser', 'Serine'),
-        'ATA': ('I', 'Ile', 'Isoleucine'),
-        'ATC': ('I', 'Ile', 'Isoleucine'),
-        'ATG': ('M', 'Met', 'Methionine'),
-        'ATT': ('I', 'Ile', 'Isoleucine'),
-        'CAA': ('Q', 'Gln', 'Glutamine'),
-        'CAC': ('H', 'His', 'Histidine'),
-        'CAG': ('Q', 'Gln', 'Glutamine'),
-        'CAT': ('H', 'His', 'Histidine'),
-        'CCA': ('P', 'Pro', 'Proline'),
-        'CCC': ('P', 'Pro', 'Proline'),
-        'CCG': ('P', 'Pro', 'Proline'),
-        'CCT': ('P', 'Pro', 'Proline'),
-        'CGA': ('R', 'Arg', 'Arginine'),
-        'CGC': ('R', 'Arg', 'Arginine'),
-        'CGG': ('R', 'Arg', 'Arginine'),
-        'CGT': ('R', 'Arg', 'Arginine'),
-        'CTA': ('L', 'Leu', 'Leucine'),
-        'CTC': ('L', 'Leu', 'Leucine'),
-        'CTG': ('L', 'Leu', 'Leucine'),
-        'CTT': ('L', 'Leu', 'Leucine'),
-        'GAA': ('E', 'Glu', 'Glutamate'),
-        'GAC': ('D', 'Asp', 'Aspartate'),
-        'GAG': ('E', 'Glu', 'Glutamate'),
-        'GAT': ('D', 'Asp', 'Aspartate'),
-        'GCA': ('A', 'Ala', 'Alanine'),
-        'GCC': ('A', 'Ala', 'Alanine'),
-        'GCG': ('A', 'Ala', 'Alanine'),
-        'GCT': ('A', 'Ala', 'Alanine'),
-        'GGA': ('G', 'Gly', 'Glycine'),
-        'GGC': ('G', 'Gly', 'Glycine'),
-        'GGG': ('G', 'Gly', 'Glycine'),
-        'GGT': ('G', 'Gly', 'Glycine'),
-        'GTA': ('V', 'Val', 'Valine'),
-        'GTC': ('V', 'Val', 'Valine'),
-        'GTG': ('V', 'Val', 'Valine'),
-        'GTT': ('V', 'Val', 'Valine'),
-        'TAC': ('Y', 'Tyr', 'Tyrosine'),
-        'TAT': ('Y', 'Tyr', 'Tyrosine'),
-        'TCA': ('S', 'Ser', 'Serine'),
-        'TCC': ('S', 'Ser', 'Serine'),
-        'TCG': ('S', 'Ser', 'Serine'),
-        'TCT': ('S', 'Ser', 'Serine'),
-        'TGC': ('C', 'Cys', 'Cysteine'),
-        'TGG': ('W', 'Trp', 'Tryptophan'),
-        'TGT': ('C', 'Cys', 'Cysteine'),
-        'TTA': ('L', 'Leu', 'Leucine'),
-        'TTC': ('F', 'Phe', 'Phenylalanine'),
-        'TTG': ('L', 'Leu', 'Leucine'),
-        'TTT': ('F', 'Phe', 'Phenylalanine'),
-        'TAG': ('*', '*', 'STOP'),
-        'TGA': ('*', '*', 'STOP'),
-        'TAA': ('*', '*', 'STOP'),
-    }):
-
-    def _get_codons(s, p=0):
-        for i in range(0, len(s), 3):
-            codon = s[i + p:i + p + 3]
-            if codon:  # don't return blank strings
-                yield codon
-
-    verbosityD = {"single": 0, "short": 1, "long": 2}
-    string = string.replace(" ", "").upper()  # remove spaces if present
-    codons = _get_codons(string, p=phase)
-    amino_acids = []
-    v = verbosityD[verbosity]
-    if v == 0:
-        joinChar = ""
-    else:
-        joinChar = "-"
-    for c in codons:
-        try:
-            amino_acids.append(codonMap[c.upper()][v])
-        except KeyError:
-            amino_acids.append('X')
-    return joinChar.join(amino_acids)
-
-
 def get_transcripts(gff, child_type):
     transcripts = defaultdict(dict)
     feature_info = defaultdict(dict)
@@ -435,11 +65,12 @@ def get_transcripts(gff, child_type):
     child_type_found = False
     regions_with_content = set()
     orphans = 0
-    with open_func(gff) as annot:
+    with flex_open(gff) as annot:
         for ln, line in enumerate(annot):
             feat = None
             try:
-                feat = GFFLineInfo(line, ln)
+                # feat = GFFLineInfo(line, ln)
+                feat = GxfParse(line, ln)
             except TypeError:
                 continue
             if feat.feat_type != child_type:
@@ -601,23 +232,25 @@ def coding_length(coords):
     return sum([abs(stop-start) + 1 for start, stop in coords])
 
 
-# def get_coding_seq(seq, coord_list):
-#     seq_list = []
-#     for coord in sorted(coord_list):
-#         seq_list.append(get_subseq(seq, *coord))
-#     full_seq = ''.join(seq_list)
+def get_intron_coords(coord_list):
+    '''
+    Generate tagged intron coordinates from a list of exon/CDS
+    coordinates.
 
-#     return full_seq
+    '''
+    i_starts = [c[1] + 1 for c, tag in coord_list[:-1]]
+    i_stops = [c[0] - 1 for c, tag in coord_list[1:]]
+    i_tags = ['intron'] * len(i_starts)
+    intron_coords = list(zip(zip(i_starts, i_stops), i_tags))
+
+    return intron_coords
 
 
 def get_coding_seq(seq, coord_list, introns=False):
     coord_list = sorted(coord_list)
     coord_list = [(c, 'exon') for c in coord_list]    
     if introns is not False:
-        i_starts = [c[1] + 1 for c, _ in coord_list[:-1]]
-        i_stops = [c[0] - 1 for c, _ in coord_list[1:]]
-        i_tags = ['intron'] * len(i_starts)
-        intron_coords = list(zip(zip(i_starts, i_stops), i_tags))
+        intron_coords = get_intron_coords(coord_list)
         coord_list.extend(intron_coords)
     seq_list = []
     for coord, tag in sorted(coord_list):
@@ -643,20 +276,21 @@ def format_output(
     strand = t_info['strand']
     region = t_info['region']
     span = ':'.join(map(str, t_info['coords']))
-    # length = str(t_info['length'])
     if non_coding is True:
         seq_coords = [t_info['coords']]
     else:
         seq_coords = t_dict['children']
     seq = get_coding_seq(region_seq, seq_coords, introns=introns)
     if strand == '-':
-        seq = reverse_complement(seq)
+        # seq = reverse_complement(seq)
+        seq = rev_comp(seq)
     if TRANSLATE is True:
-        seq = translate_seq(seq)
+        # seq = translate_seq(seq)
+        seq = translate(seq)
     length = str(len(seq))
     gene = t_info['parent']
     if gene is None: 
-        gene = 'unknown'
+        gene = '?'
     header_bits = [t_name, gene, region, strand, span, length]
     if verbose is True:
         coord_string = ','.join(['-'.join(list(map(str, c))) for c in sorted(seq_coords)])
@@ -664,29 +298,6 @@ def format_output(
     header = '\t'.join(header_bits)
 
     return '>{}\n{}'.format(header, seq)
-    
-
-def get_runtime(start_time, p=3):
-    """
-    Takes a start time and optional decimal precision p,
-    returns a string of the total run-time until current
-    time with appropriate units.
-
-    """
-    total = time.time() - start_time  # start with seconds
-    divided = total/60.0
-    if divided < 2:
-        run_time = total
-        units = "seconds"
-    elif divided < 60:
-        run_time = divided
-        units = "minutes"
-    else:
-        run_time = divided/60.0
-        units = "hours"
-    rounded = round(run_time, p)
-
-    return "{} {}".format(rounded, units)
 
 
 parser = argparse.ArgumentParser(
@@ -735,7 +346,7 @@ parser.add_argument(
     action='store_true',
     help=(
         'include non-coding (intronic, UTR, etc.) sequence; uses only the '
-        'coordinates of the transcript itself')
+        'coordinates of the transcript itself (incompatible with --introns)')
 )
 parser.add_argument(
     '--introns',
@@ -748,7 +359,8 @@ parser.add_argument(
     type=int,
     metavar='int_length',
     help=(
-        'truncate intron sequences to length {int_length} (or length -1 if odd)'
+        'truncate intron sequences to length {int_length} '
+        '(or {int_length} -1 if odd)'
     )
 )
 
@@ -804,7 +416,7 @@ if not ISOFORMS:
 seq_count = 0
 total_regions = len(transcripts)
 
-for region, region_seq in fasta_parse(GENOME):
+for region, region_seq in fasta_parse(flex_open(GENOME)):
     if region not in transcripts:
         continue
     region_dict = transcripts[region]
