@@ -23,11 +23,12 @@ optional arguments:
 import sys
 import os
 import subprocess
-from collections import namedtuple
-from itertools import zip_longest
 import shlex
 import time
 import argparse
+from collections import namedtuple
+from itertools import zip_longest
+from biogl import get_runtime
 
 # taken directly from https://docs.python.org/3/library/itertools.html#recipes
 def grouper(iterable, n, fillvalue=None):
@@ -243,6 +244,8 @@ sra_files = []
 
 extra_arg_string = ' '.join(extra_args)
 
+start_time = time.time()
+
 for acc in accs:
     if '-X' not in extra_args:
         acc_filename = fetch_sra(acc, args.overwrite)
@@ -264,7 +267,11 @@ for acc in accs:
         if os.path.isfile(acc_filename):
             os.remove(acc_filename)
 
+runtime = get_runtime(start_time)
 
-print('[#] All commands finished. Exiting now.', file=sys.stderr)
+print(
+    '[#] All commands finished in {}. Exiting now.'.format(runtime), 
+    file=sys.stderr
+)
 
 sys.exit(0)
