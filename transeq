@@ -28,144 +28,19 @@ optional arguments:
 import sys
 import os
 import argparse
+from biogl import fasta_parse, translate, rev_comp
 
-def fasta_parse(fasta, separator=None):
-    """
-    Iterator which takes FASTA as input. Yields
-    header/values list pairs. If separator arg,
-    will output a string of values joined by
-    separator character (e.g separator="" will
-    return a string with no spaces or intervening
-    characters).
-    """
-    header, seq = None, []
-    with open(fasta) as fastaFile:
-        for line in fastaFile:
-            if line.startswith('>'):
-                if header:
-                    if separator != None:
-                        seq = separator.join(str(e) for e in seq)
-                    yield header, seq
-                header = line.strip().lstrip('>')
-                seq = []
-            elif line.startswith('#'):
-                continue
-            else:
-                seq.append(line.rstrip('\n'))
-        if separator != None:
-            seq = separator.join(str(e) for e in seq)
-        yield header, seq
-
-def translate_seq(
-    string, 
-    verbosity="single", 
-    phase=0, 
-    rev=False, 
-    stop_char='*'):
-    codonMap = {
-        'AAA': ('K', 'Lys', 'Lysine'),
-        'AAC': ('N', 'Asn', 'Asparagine'),
-        'AAG': ('K', 'Lys', 'Lysine'),
-        'AAT': ('N', 'Asn', 'Asparagine'),
-        'ACA': ('T', 'Thr', 'Threonine'),
-        'ACC': ('T', 'Thr', 'Threonine'),
-        'ACG': ('T', 'Thr', 'Threonine'),
-        'ACT': ('T', 'Thr', 'Threonine'),
-        'AGA': ('R', 'Arg', 'Arginine'),
-        'AGC': ('S', 'Ser', 'Serine'),
-        'AGG': ('R', 'Arg', 'Arginine'),
-        'AGT': ('S', 'Ser', 'Serine'),
-        'ATA': ('I', 'Ile', 'Isoleucine'),
-        'ATC': ('I', 'Ile', 'Isoleucine'),
-        'ATG': ('M', 'Met', 'Methionine'),
-        'ATT': ('I', 'Ile', 'Isoleucine'),
-        'CAA': ('Q', 'Gln', 'Glutamine'),
-        'CAC': ('H', 'His', 'Histidine'),
-        'CAG': ('Q', 'Gln', 'Glutamine'),
-        'CAT': ('H', 'His', 'Histidine'),
-        'CCA': ('P', 'Pro', 'Proline'),
-        'CCC': ('P', 'Pro', 'Proline'),
-        'CCG': ('P', 'Pro', 'Proline'),
-        'CCT': ('P', 'Pro', 'Proline'),
-        'CGA': ('R', 'Arg', 'Arginine'),
-        'CGC': ('R', 'Arg', 'Arginine'),
-        'CGG': ('R', 'Arg', 'Arginine'),
-        'CGT': ('R', 'Arg', 'Arginine'),
-        'CTA': ('L', 'Leu', 'Leucine'),
-        'CTC': ('L', 'Leu', 'Leucine'),
-        'CTG': ('L', 'Leu', 'Leucine'),
-        'CTT': ('L', 'Leu', 'Leucine'),
-        'GAA': ('E', 'Glu', 'Glutamate'),
-        'GAC': ('D', 'Asp', 'Aspartate'),
-        'GAG': ('E', 'Glu', 'Glutamate'),
-        'GAT': ('D', 'Asp', 'Aspartate'),
-        'GCA': ('A', 'Ala', 'Alanine'),
-        'GCC': ('A', 'Ala', 'Alanine'),
-        'GCG': ('A', 'Ala', 'Alanine'),
-        'GCT': ('A', 'Ala', 'Alanine'),
-        'GGA': ('G', 'Gly', 'Glycine'),
-        'GGC': ('G', 'Gly', 'Glycine'),
-        'GGG': ('G', 'Gly', 'Glycine'),
-        'GGT': ('G', 'Gly', 'Glycine'),
-        'GTA': ('V', 'Val', 'Valine'),
-        'GTC': ('V', 'Val', 'Valine'),
-        'GTG': ('V', 'Val', 'Valine'),
-        'GTT': ('V', 'Val', 'Valine'),
-        'TAC': ('Y', 'Tyr', 'Tyrosine'),
-        'TAT': ('Y', 'Tyr', 'Tyrosine'),
-        'TCA': ('S', 'Ser', 'Serine'),
-        'TCC': ('S', 'Ser', 'Serine'),
-        'TCG': ('S', 'Ser', 'Serine'),
-        'TCT': ('S', 'Ser', 'Serine'),
-        'TGC': ('C', 'Cys', 'Cysteine'),
-        'TGG': ('W', 'Trp', 'Tryptophan'),
-        'TGT': ('C', 'Cys', 'Cysteine'),
-        'TTA': ('L', 'Leu', 'Leucine'),
-        'TTC': ('F', 'Phe', 'Phenylalanine'),
-        'TTG': ('L', 'Leu', 'Leucine'),
-        'TTT': ('F', 'Phe', 'Phenylalanine'),
-        'TAA': (stop_char, stop_char, 'STOP'),
-        'TAG': (stop_char, stop_char, 'STOP'),
-        'TGA': (stop_char, stop_char, 'STOP'),
-        '---': ('-', '-', 'GAP')
-    }
-
-    def get_codons(s, p=0):
-        codons = [s[i + p:i + p + 3] for i in range(0, len(s), 3)]
-        return [c for c in codons if len(c) == 3]
-    string = string.strip().replace(" ", "").upper()  # remove spaces if present
-    if rev is True:
-        string = reverse_complement(string)
-    codons = get_codons(string, p=phase)
-    if not codons:
-        return '?', '?'
-    stop_codons = ("TAA", "TAG", "TGA")
-    verbosityD = {"single": 0, "short": 1, "long": 2}
-    amino_acids = []
-    v = verbosityD[verbosity]
-    if v == 0:
-        joinChar = ""
-    else:
-        joinChar = "-"
-    for c in codons:
-        try:
-            amino_acids.append(codonMap[c.upper()][v])
-        except KeyError:
-            if NO_MASK:
-                amino_acids.append(c.lower())
-            else:
-                amino_acids.append('X')
-    return joinChar.join(amino_acids)
 
 def parse_seq(s):
     if s.startswith(">"):
         print(s.strip())
         return
-    aas = translate_seq(
+    if rev_choice is True:
+        s = rev_comp(s)
+    aas = translate(
         s, 
         verbosity=v_level, 
         phase=phase_choice,
-        rev=rev_choice,
         stop_char=STOP_CHAR)
     print(aas, flush=True)
 
@@ -201,22 +76,25 @@ def parse_file(seqFile):
 
     if isFasta:
         for h, s in fasta_parse(seqFile, separator=""):
-            aas = translate_seq(
+            if rev_choice is True:
+                s = reverse_complement(s)
+            aas = translate(
                 s, 
                 verbosity=v_level, 
                 phase=phase_choice, 
-                rev=rev_choice, 
                 stop_char=STOP_CHAR)
             print(">" + h + "\t")
             print(aas, flush=True)
     else:
         with open(seqFile) as f:
             for l in f:
-                aas = translate_seq(
+                l = l.strip()
+                if rev_choice is True:
+                    l = rev_comp(l)
+                aas = translate(
                     l, 
                     verbosity=v_level, 
                     phase=phase_choice, 
-                    rev=rev_choice, 
                     stop_char=STOP_CHAR)
                 print(aas, flush=True)
 
