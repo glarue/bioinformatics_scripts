@@ -31,11 +31,12 @@ optional arguments:
                         apply to explicitly labeled queries)
   --full_header         match on full header string (including whitespace)
   -t integer, --truncate integer
-                        truncate sequence to {integer} * 2 (from both ends);
-                        e.g. -t 50 --> total length of 100
+                        truncate sequence to the nearest even integer <=
+                        {integer} (equally from both ends)
 """
 import sys
 import argparse
+from math import floor
 from codecs import decode
 from biogl import fasta_parse, flex_open, rev_comp
 
@@ -232,8 +233,8 @@ parser.add_argument(
     '-t',
     '--truncate',
     help=(
-        'truncate sequence to {integer} * 2 (from both ends); e.g. -t 50 --> '
-        'total length of 100'),
+        'truncate sequence to the nearest even integer <= {integer} '
+        '(equally from both ends)'),
     type=int,
     metavar='integer',
     default=None
@@ -246,6 +247,11 @@ FLANK = args.flank
 FLANK_SEPARATOR = decode(args.separator, 'unicode escape')
 EXCLUDE_HEADER = args.exclude_header
 TRUNCATE = args.truncate
+
+if TRUNCATE:
+    TRUNC_LENGTH = floor(TRUNCATE / 2)
+else:
+    TRUNC_LENGTH = 0
 
 if args.full_header:
     TRIM = False
@@ -275,8 +281,8 @@ for seq, seq_info in seqs_from_fasta(FASTA, info_dict, EXCLUDE_HEADER):
         bits = []
         if FLANK:
             up, seq, down = seq.split(FLANK_SEPARATOR)
-        if len(seq) > TRUNCATE * 2:
-            seq = seq[:TRUNCATE] + seq[-TRUNCATE:]
+        if len(seq) > TRUNCATE:
+            seq = seq[:TRUNC_LENGTH] + seq[-TRUNC_LENGTH:]
         if FLANK:
             seq = FLANK_SEPARATOR.join([up, seq, down])
     if seq_info["label"]:
