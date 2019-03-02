@@ -375,10 +375,14 @@ REF_NAME = CMDS[0]
 
 CMD_STRING = ' '.join(CMDS)
 
+# determine where Bash is located to allow execution of
+# Bash-specific commands (as opposed to the default sh)
+SHELL = subprocess.check_output('echo $SHELL', shell=True, universal_newlines=True).strip()
+
 # Run external script
 start_time = time.time()
 run_dir = os.getcwd()
-return_code = subprocess.call(CMD_STRING, shell=True)
+return_code = subprocess.call(CMD_STRING, shell=True, executable=SHELL)
 run_time = get_runtime(start_time)
 
 # For list-style format of email
