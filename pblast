@@ -41,6 +41,7 @@ import os
 import time
 import argparse
 from multiprocessing import Pool, cpu_count
+from itertools import chain
 from functools import partial
 from math import ceil, log
 from biogl import fasta_parse, get_runtime, translate
@@ -130,22 +131,22 @@ def local_blast(
     if filename is None:
         filename = "{}-vs-{}.{}".format(
             query_abbrev, db_abbrev, blast_type)
-    cmd_args = [
-        blast_type,
-        "-db",
-        db_file,
-        "-query",
-        query_file,
-        "-evalue",
-        e_value,
-        "-num_threads",
-        threads,
-        "-outfmt",
-        out_fmt,
-        "-out",
-        filename,
-        *extra_blast_args
-    ]
+    cmd_kwargs = {
+        '-db': db_file,
+        '-query': query_file,
+        '-evalue': e_value,
+        '-num_threads': threads,
+        '-outfmt': out_fmt,
+        '-out': filename
+    }
+    # avoid redundant arguments being passed to BLAST
+    cmd_kwargs = {
+        k: v for k, v in cmd_kwargs.items() if k not in extra_blast_args
+    }
+    # flatten to list of args
+    cmd_args = [blast_type]
+    cmd_args.extend(
+        list(chain.from_iterable(cmd_kwargs.items())) + extra_blast_args)
     cmd_args = [str(c) for c in cmd_args]
     cmd_string = ' '.join(cmd_args)
     vs = "'{}' vs. '{}'".format(query_file, db_file)
