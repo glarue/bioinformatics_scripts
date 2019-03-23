@@ -36,13 +36,13 @@ def check_fasta(f):
             else:
                 return False
 
+    return False
+
 
 # this version is slightly faster (memory-mapped file object optimized
 # for line reading)
 def count_lines(filename):
-    fa = False
-    if check_fasta(filename):
-        fa = True
+    fa = check_fasta(filename)
     with open(filename) as f:
         buf = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
         line_count = 0
@@ -67,7 +67,7 @@ def line_iterator(f):
     # Check if file is FASTA to determine correct parsing behavior
     is_fa = check_fasta(f)
     if is_fa:
-        for h, s in fasta_parse(f, trim_header=False):
+        for h, s in fasta_parse(f, trim_header=False, separator='\n'):
             yield ">{}\n{}".format(h, s)
     else:
         with open(f) as infile:
