@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+
+import sys
+import fileinput
+import statistics as st
+
+numbers = []
+strings = []
+
+for l in fileinput.input():
+    l = l.strip()
+    try:
+        numbers.append(float(l))
+    except ValueError:
+        if len(l) != 0:
+            strings.append(len(l))
+
+if numbers:
+    count = len(numbers)
+    max_v = max(numbers)
+    min_v = min(numbers)
+    sum_v = sum(numbers)
+    mean = st.mean(numbers)
+    median = st.median(numbers)
+    try:
+        stdev = st.stdev(numbers)
+    except st.StatisticsError:  # single value
+        stdev = 'N/A'
+    n_values = [count, max_v, min_v, sum_v, mean, median, stdev]
+    
+
+if strings:
+    s_count = len(strings)
+    s_max = max(strings)
+    s_min = min(strings)
+    s_sum = sum(strings)
+    s_mean = st.mean(strings)
+    s_median = st.median(strings)
+    try:
+        s_stdev = st.stdev(strings)
+    except st.StatisticsError:  # single value
+        s_stdev = 'N/A'
+    s_values = [s_count, s_max, s_min, s_sum, s_mean, s_median, s_stdev]
+    
+
+
+properties = ['count', 'max', 'min', 'sum', 'mean', 'median', 'stdev']
+
+if numbers:
+    print('# type: numeric')
+    for p, v in zip(properties, n_values):
+        print(p + '\t' + str(v))  
+
+if strings:
+    print('# type: text')
+    for p, v in zip(properties, s_values):
+        print(p + '\t' + str(v))
+
+sys.exit(0)

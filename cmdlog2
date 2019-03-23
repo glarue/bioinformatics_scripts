@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+
+"""
+A wrapper script that will write the command-line
+args associated with any files generated to a log
+file in the directory where the files were made.
+
+"""
+import sys
+import os
+from os import listdir
+from os.path import isfile, join
+import subprocess
+import time
+from datetime import datetime
+import argparse
+
+
+def listFiles(mypath):
+    """
+    Return relative paths of all files in mypath
+
+    """
+    return [join(mypath, f) for f in listdir(mypath) if
+            isfile(join(mypath, f))]
+
+def read_log(log_file):
+    """
+    Reads a file history log and returns a dictionary
+    of {filename: command} entries.
+
+    Expects tab-separated lines of [time, filename, command]
+
+    """
+    entries = {}
+    with open(log_file) as log:
+        for l in log:
+            l = l.strip()
+            mod, name, cmd = l.split("\t")
+            # cmd = cmd.lstrip("\"").rstrip("\"")
+            entries[name] = [cmd, mod]
+    return entries
+
+def time_sort(t, fmt):
+    """
+    Turn a strftime-formatted string into a tuple
+    of time info
+
+    """
+    parsed = datetime.strptime(t, fmt)
+    return parsed
+
+def log_format(time_string, dir, cmd, note=None):
+    header = '{} | {}'.format(time_string, dir)
+    if note:
+        note = '# NOTE: {}'.format(note)
+    strings = [s for s in [note, cmd] if s]
+    strings = '\n'.join(strings)
+    log_string = '# {}\n{}'.format(header, strings)
+
+    return log_string
+
+parser = argparse.ArgumentParser(
+    description='Log a shell commmand with optional note'
+)
+parser.add_argument(
+    'shell_cmds',
+    metavar='shell commands',
+    help='one or more commands to be sent to the shell '
+    '(may require single or double quotes)',
+    nargs='+'
+)
+
+
+args, unknown = parser.parse_known_args()
+ARG_LIST = args.shell_cmds + unknown
+
+# ARG_LIST = sys.argv [1:]
+
+ARG_STRING = ' '.join(ARG_LIST)
+
+TIME_FMT = "%Y-%m-%d@%H:%M:%S"
+
+# determine where Bash is located to allow execution of
+# Bash-specific commands (as opposed to the default sh)
+SHELL = subprocess.check_output('echo $SHELL', shell=True, universal_newlines=True).strip()
+
+# Guess where logfile should be put
+if (">" or ">>") in ARG_LIST:
+    # Get position after redirect in arg list
+    redirect_index = max(ARG_LIST.index(e) for e in ARG_LIST if e in ">>")
+    output = ARG_LIST[redirect_index + 1]
+    output = os.path.abspath(output)
+    out_dir = os.path.dirname(output)
+elif ("cp" or "mv") in ARG_LIST:
+    output = ARG_LIST[-1]
+    out_dir = os.path.dirname(output)
+else:
+    out_dir = os.getcwd()
+
+all_files = listFiles(out_dir)
+
+# Set logfile location within the inferred output directory
+LOGFILE = out_dir + "/cmdlog.log"
+
+# ask for description of command to include in log
+note = input('[#] (cmdlog) Note for log (enter to skip):\n')
+
+# Run the desired external commands
+subprocess.call(ARG_STRING, shell=True, executable=SHELL)
+
+# Get done time of external commands
+log_time = time.strftime(TIME_FMT)
+
+if not os.path.isfile(LOGFILE):
+    log = open(LOGFILE, 'w')
+else:
+    log = open(LOGFILE, 'a')
+
+# Write changed files to logfile
+log.write(log_format(log_time, out_dir, ARG_STRING, note) + '\n\n')
+
+sys.exit(0)
