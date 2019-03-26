@@ -62,16 +62,16 @@ def unique_filenames(*file_list):
         return abbreviated
 
 
-def db_check(db_filename):
+def db_check(db_filename, db_endings):
+    end_length = len(max(db_endings, key=len))
     db_directory = os.path.dirname(os.path.abspath(db_filename))
     db_name = os.path.basename(db_filename)
     db_dir_files = os.listdir(db_directory)
     db_dir_files = [f for f in db_dir_files if f.startswith(db_name)]
-    # db_endings = ('sq', 'si', 'sd', 'og', 'in', 'hr')
-    db_endings = ('sq', 'in', 'hr')
+    # db_endings = ('sq', 'in', 'hr')
     # get just the file endings
     db_files = [f.split('.')[-1] for f in db_dir_files]
-    present_endings = set([f[-2:] for f in db_files])
+    present_endings = set([f[-end_length:] for f in db_files])
     if all(dbe in present_endings for dbe in db_endings):
         previous_db = True
     else:
@@ -80,82 +80,40 @@ def db_check(db_filename):
     return previous_db
 
 
-def make_blast_db(fasta, db_type="nucleotide"):
+def make_db(fasta, aligner, db_type="nucleotide"):
     """
-    Creates a local BLAST+ database using a
+    Creates a local BLAST/DIAMOND database using a
     FASTA file. $db_type may be either "protein"
     or "nucleotide".
 
     """
-    print("[#] Creating local BLAST database", file=sys.stderr)
+    print(
+        "[#] Creating local {} database".format(aligner.upper()), 
+        file=sys.stderr
+    )
     type_map = {
         'protein': 'prot',
         'nucleotide': 'nucl'
     }
-    cmd_args = [
-        "makeblastdb",
-        "-in",
-        fasta,
-        "-dbtype",
-        type_map[db_type]
-    ]
-    subprocess.call(cmd_args)
-    print("\n[#] BLAST database for '{}' created"
-          .format(fasta), file=sys.stderr)
-
-
-def local_blast(
-        db_file, 
-        blast_type, 
-        query_file, 
-        filename,
-        out_fmt=6, 
-        threads=1, 
-        e_value=1e-10,
-        extra_blast_args=None):
-    """
-    Runs BLAST+ sub-program (blastp, blastn, blastx, tblastn, tblastx)
-    with the given query on the given database.
-
-    Optional: out_fmt = type as per BLAST+ documentation; threads = number
-    of threads to use for job; e = e-value cutoff for hits
-
-    extra_blast_args is a list of additional arguments to pass to BLAST
-
-    """
-    if extra_blast_args is None:
-        extra_blast_args = []  # make unpacking syntax work
-    start_time = time.time()
-    db_abbrev = abbreviate(db_file)
-    query_abbrev = abbreviate(query_file)
-    if filename is None:
-        filename = "{}-vs-{}.{}".format(
-            query_abbrev, db_abbrev, blast_type)
-    cmd_kwargs = {
-        '-db': db_file,
-        '-query': query_file,
-        '-evalue': e_value,
-        '-num_threads': threads,
-        '-outfmt': out_fmt,
-        '-out': filename
+    cmd_map = {
+        'diamond': [
+            'diamond',
+            'makedb',
+            '--in',
+            fasta,
+            '--db',
+            fasta],
+        'blast': [
+            'makeblastdb',
+            '-in',
+            fasta,
+            '-dbtype',
+            type_map[db_type]]
     }
-    # avoid redundant arguments being passed to BLAST
-    cmd_kwargs = {
-        k: v for k, v in cmd_kwargs.items() if k not in extra_blast_args
-    }
-    # flatten to list of args
-    cmd_args = [blast_type]
-    cmd_args.extend(
-        list(chain.from_iterable(cmd_kwargs.items())) + extra_blast_args)
-    cmd_args = [str(c) for c in cmd_args]
-    cmd_string = ' '.join(cmd_args)
-    vs = "'{}' vs. '{}'".format(query_file, db_file)
-    print("[#] Starting BLAST run {}:\n{}"
-          .format(vs, cmd_string), file=sys.stderr)
+    cmd_args = cmd_map[aligner]
     subprocess.call(cmd_args)
-    run_time = get_runtime(start_time)
-    print("[#] BLAST: {} finished in {}".format(vs, run_time), file=sys.stderr)
-    return filename
+    print("\n[#] {} database created for '{}'"
+          .format(aligner, fasta), file=sys.stderr)
 
 
 def is_fasta(some_file):
@@ -206,79 +164,163 @@ def make_pro(fasta, ftype=''):
     return out_name
 
 
-def prep_blast(subject, query, blast_type, no_format=False, overwrite=True):
+def prep_run(
+    query, subject, aligner, run_type, no_format=False, overwrite=True):
+    pair_combos = {
+        'pro-pro': {
+            'query': 'protein',
+            'subject': 'protein'},
+        'nuc-nuc': {
+            'query': 'nucleotide',
+            'subject': 'nucleotide'},
+        'pro-nuc': {
+            'query': 'protein',
+            'subject': 'nucleotide'},
+        'nuc-pro': {
+            'query': 'nucleotide',
+            'subject': 'protein'}
+    }
     db_type_map = {
-        'blastn': {
-            'query': 'nucleotide',
-            'subject': 'nucleotide'},
-        'blastp': {
-            'query': 'protein',
-            'subject': 'protein'},
-        'blastx': {
-            'query': 'nucleotide',
-            'subject': 'protein'},
-        'tblastn': {
-            'query': 'protein',
-            'subject': 'nucleotide'},
-        'tblastx': {
-            'query': 'nucleotide',
-            'subject': 'nucleotide'}
+        'blastn': 'nuc-nuc',
+        'blastp': 'pro-pro',
+        'blastx': 'nuc-pro',
+        'tblastn': 'pro-nuc',
+        'tblastx': 'nuc-nuc'
+    }
+    db_endings_map = {
+        'blast': ['sq', 'in', 'hr'],
+        'diamond': ['dmnd']
     }
 
-    blast_files = {'query': query, 'subject': subject}
+    run_files = {'query': query, 'subject': subject}
 
     # determine what format the files should be (pro or nucl)
     # based upon the BLAST type
     target_format = {}
-    for ftype, fn in blast_files.items():
-        target_format[ftype] = db_type_map[blast_type][ftype]
+    for ftype, fn in run_files.items():
+        db_type = db_type_map[run_type]
+        target_format[ftype] = pair_combos[db_type][ftype]
 
     # convert the appropriate files to protein if needed
     if not no_format:
-        for ftype, fn in blast_files.items():
+        for ftype, fn in run_files.items():
             fmt = target_format[ftype]
             if fmt == 'protein' and seq_type(fn) != 'protein':
                 fn = make_pro(fn, ftype)
                 # add new fn to dict
                 target_format[ftype] = fmt
-                blast_files[ftype] = fn
+                run_files[ftype] = fn
     
-    subject = blast_files['subject']
-    query = blast_files['query']
+    subject = run_files['subject']
+    query = run_files['query']
 
     # check for already-created database
-    if db_check(subject):
+    db_ends = db_endings_map[aligner]
+    if db_check(subject, db_ends):
         if overwrite:
-            print('[#] Replacing existing BLAST database for \'{}\''
-                  .format(subject))
-            make_blast_db(subject, db_type=target_format['subject'])
+            print('[#] Replacing existing {} database for \'{}\''
+                  .format(aligner.upper(), subject))
+            make_db(subject, aligner, db_type=target_format['subject'])
         else:
-            print('[#] Using existing BLAST database for \'{}\''
-            .format(subject), file=sys.stderr)
+            print('[#] Using existing {} database for \'{}\''
+            .format(aligner.upper(), subject), file=sys.stderr)
     elif not no_format:
-        make_blast_db(subject, db_type=target_format['subject'])
+        make_db(subject, aligner, db_type=target_format['subject'])
 
-    return subject, query
+    return query, subject
 
 
-def parallel_blast(
+def local_alignment(
+        aligner,
+        db_file,
+        run_type,
+        query_file,  # this order is important for partial()
+        filename,  # this order is important for partial()
+        out_fmt=6, 
+        threads=1, 
+        e_value=1e-10,
+        extra_args=None):
+    """
+    Runs alignment sub-program (blastp, blastn, blastx, tblastn, tblastx)
+    with the given query on the given database.
+
+    Optional: out_fmt = type as per BLAST+ documentation; threads = number
+    of threads to use for job; e = e-value cutoff for hits
+
+    extra_args is a list of additional arguments to pass to the aligner
+
+    """
+    if extra_args is None:
+        extra_args = []  # make unpacking syntax work
+    start_time = time.time()
+    db_abbrev = abbreviate(db_file)
+    query_abbrev = abbreviate(query_file)
+    output_suffix = '.'.join([aligner, run_type])
+    if filename is None:
+        filename = "{}-vs-{}.{}".format(
+            query_abbrev, db_abbrev, output_suffix)
+    cmd_kwargs = {
+        'blast': {
+            '-db': db_file,
+            '-query': query_file,
+            '-evalue': e_value,
+            '-num_threads': threads,
+            '-outfmt': out_fmt,
+            '-out': filename},
+        'diamond': {
+            '--db': db_file,
+            '--query': query_file,
+            '--evalue': e_value,
+            '--threads': threads,
+            '--outfmt': out_fmt,
+            '--out': filename}
+    }
+    # avoid redundant arguments being passed to BLAST
+    cmd_kwargs = {
+        k: v for k, v in cmd_kwargs[aligner].items() if k not in extra_args
+    }
+    # flatten to list of args
+    if aligner == 'diamond':
+        cmd_args = [aligner, run_type]
+    else:
+        cmd_args = [run_type]
+    cmd_args.extend(
+        list(chain.from_iterable(cmd_kwargs.items())) + extra_args)
+    cmd_args = [str(c) for c in cmd_args]
+    cmd_string = ' '.join(cmd_args)
+    vs = "'{}' vs. '{}'".format(query_file, db_file)
+    print("[#] Starting {} run {}:\n{}"
+          .format(aligner.upper(), vs, cmd_string), file=sys.stderr)
+    subprocess.call(cmd_args)
+    run_time = get_runtime(start_time)
+    print(
+        "[#] {}: {} finished in {}".format(aligner.upper(), vs, run_time), 
+        file=sys.stderr
+    )
+
+    return filename
+
+
+def parallel_alignment(
+        aligner,
+        query,
         subject, 
-        query, 
-        blast_type,
+        run_type,
         out_fmt=6,
         e_value=1e-10,
         threads=1,
         out_name=None,
-        extra_blast_args=None):
+        extra_args=None):
     pool = Pool(PARALLEL)
-    blast = partial(
-        local_blast, 
+    align = partial(
+        local_alignment,
+        aligner,
         subject, 
-        blast_type,
+        run_type,
         threads=threads,
         out_fmt=out_fmt,
         e_value=e_value, 
-        extra_blast_args=extra_blast_args)
+        extra_args=extra_args)
     count = sum([1 for p in fasta_parse(query)])
     block_size = ceil(count / PARALLEL)
     # change padding depth according to total number of chunks
@@ -288,6 +330,7 @@ def parallel_blast(
     chunk = open(chunk_name, 'w')
     chunked = [chunk_name]
     tally = 1
+    output_suffix = '.'.join([aligner, run_type])
     for index, (h, s) in enumerate(fasta_parse(query), start=1):   
         if index > block_size and index % block_size == 1:
             tally += 1
@@ -305,7 +348,7 @@ def parallel_blast(
           .format(len(chunked), chunk_list))
     if out_name is None:
         out_name = '{}-vs-{}.{}'.format(
-            abbreviate(query), abbreviate(subject), blast_type)
+            abbreviate(query), abbreviate(subject), output_suffix)
     filenames = [
         '{0}.{1:0{2}}.tmp'.format(out_name, i, zero_pad) 
         for i in range(1, len(chunked) + 1)
@@ -314,7 +357,7 @@ def parallel_blast(
     # to print to screen without clobbering each other
     results = []
     for pair in zip(chunked, filenames):
-        results.append(pool.apply_async(blast, args=pair))
+        results.append(pool.apply_async(align, args=pair))
         time.sleep(.05)
     pool.close()
     pool.join()
@@ -336,37 +379,53 @@ def concatenate(outname, file_list, clean=True):
         [os.remove(fn) for fn in file_list]
 
 
+def parse_run_type(align_type_arg):
+    type_map = {
+        'diamondp': ('diamond', 'blastp'),
+        'diamondx': ('diamond', 'blastx'),
+        'blastn': ('blast', 'blastn'),
+        'blastp': ('blast', 'blastp'),
+        'blastx': ('blast', 'blastx'),
+        'tblastn': ('blast', 'tblastn'),
+        'tblastx': ('blast', 'tblastx'),
+    }
+
+    return type_map[align_type_arg]
+
+
 parser = argparse.ArgumentParser(
     description=(
-        'BLAST one file against another. '
+        'Align one file against another. '
         'Any arguments not listed here will '
-        'be passed to BLAST unmodified.'),
+        'be passed to the chosen aligner unmodified.'),
     formatter_class=argparse.ArgumentDefaultsHelpFormatter, 
     allow_abbrev=False)
 
 parser.add_argument(
     'query',
-    help='query file to be BLASTed'
+    help='query file to be aligned'
 )
 parser.add_argument(
     'subject',
-    help='subject file to be BLASTed against'
+    help='subject file to be aligned against'
 )
 parser.add_argument(
-    'blast_type',
+    'align_type',
     choices=[
+        'diamondp',
+        'diamondx',
         'blastn',
         'blastp',
         'blastx',
         'tblastn',
         'tblastx'],
-    help='type of BLAST program to run'
+    help='type of alignment to run'
 )
 parser.add_argument(
     '-p',
     '--parallel_processes',
     help=(
-        'run the BLAST step using multiple parallel processes; '
+        'run the alignment step using multiple parallel processes; '
         'if unspecified, will use half of available system CPUs'),
     type=int
 )
@@ -380,7 +439,7 @@ parser.add_argument(
     '-f',
     '--output_format',
     type=int,
-    help='integer output format for BLAST results',
+    help='integer output format for alignment results',
     default=6
 )
 parser.add_argument(
@@ -409,7 +468,7 @@ parser.add_argument(
     '-naf',
     '--no_auto_format',
     help='disable helper operations that auto-format subject/query as needed '
-    'and build BLAST database if not already present',
+    'and build database if not already present',
     action='store_true'
 )
 parser.add_argument(
@@ -425,7 +484,7 @@ main_start_time = time.time()
 
 args, EXTRA_ARGS = parser.parse_known_args()
 
-BLAST_TYPE = args.blast_type
+ALIGN_TYPE = args.align_type
 PARALLEL = args.parallel_processes
 SINGLE = args.single
 OUT_NAME = args.output_name
@@ -453,44 +512,53 @@ if not NO_AUTO:
 SUBJECT = run_files['subject']
 QUERY = run_files['query']
 
+ALIGNER, RUN_TYPE = parse_run_type(ALIGN_TYPE)
+
+if ALIGNER == 'diamond':
+    EXTRA_ARGS.extend(
+        ['--quiet', '--more-sensitive', '--max-target-seqs', '500'])
+
 if not OUT_NAME:
     subj, quer = unique_filenames(SUBJECT, QUERY)
+    out_suffix = '.'.join([ALIGNER, RUN_TYPE])
     OUT_NAME = '{}-vs-{}.{}'.format(
         quer, 
         subj,
-        BLAST_TYPE)
+        out_suffix)
 
-SUBJECT, QUERY = prep_blast(
-    SUBJECT, QUERY, BLAST_TYPE, no_format=NO_AUTO, overwrite=OVERWRITE)
+QUERY, SUBJECT = prep_run(
+    QUERY, SUBJECT, ALIGNER, RUN_TYPE, no_format=NO_AUTO, overwrite=OVERWRITE)
 
 current_runtime = get_runtime(main_start_time)
 print('[#] Database prep finished in {}'.format(current_runtime))
 
 if not SINGLE and PARALLEL > 1: #PARALLEL:
     # run multiple processes, and then join the output afterward
-    pblast_out = parallel_blast(
+    pblast_out = parallel_alignment(
+        ALIGNER,
+        QUERY,
         SUBJECT, 
-        QUERY, 
-        BLAST_TYPE,
+        RUN_TYPE,
         threads=THREADS,
         out_fmt=OUT_FORMAT,
         e_value=E_VALUE, 
         out_name=OUT_NAME,
-        extra_blast_args=EXTRA_ARGS)
+        extra_args=EXTRA_ARGS)
     concatenate(OUT_NAME, pblast_out)
 else:
-    blast_out = local_blast(
+    blast_out = local_alignment(
+        ALIGNER,
         SUBJECT, 
-        BLAST_TYPE, 
-        QUERY,
+        RUN_TYPE,
+        QUERY, 
+        OUT_NAME,
         threads=THREADS,
         out_fmt=OUT_FORMAT,
-        filename=OUT_NAME, 
         e_value=E_VALUE,
-        extra_blast_args=EXTRA_ARGS)
+        extra_args=EXTRA_ARGS)
 
 current_runtime = get_runtime(main_start_time)
-print( '[#] BLAST run finished in {}'.format(current_runtime))
+print( '[#] {} run finished in {}'.format(ALIGNER.upper(), current_runtime))
 print('[#] Results written to \'{}\''.format(OUT_NAME))
 
 sys.exit(0)
