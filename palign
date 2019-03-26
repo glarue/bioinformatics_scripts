@@ -74,7 +74,6 @@ def db_check(db_filename, db_endings):
     db_name = os.path.basename(db_filename)
     db_dir_files = os.listdir(db_directory)
     db_dir_files = [f for f in db_dir_files if f.startswith(db_name)]
-    # db_endings = ('sq', 'in', 'hr')
     # get just the file endings
     db_files = [f.split('.')[-1] for f in db_dir_files]
     present_endings = set([f[-end_length:] for f in db_files])
