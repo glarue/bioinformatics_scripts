@@ -107,7 +107,9 @@ def make_db(fasta, aligner, db_type="nucleotide"):
             '--in',
             fasta,
             '--db',
-            fasta],
+            fasta,
+            '--threads',
+            str(THREADS)],
         'blast': [
             'makeblastdb',
             '-in',
@@ -118,7 +120,7 @@ def make_db(fasta, aligner, db_type="nucleotide"):
     cmd_args = cmd_map[aligner]
     subprocess.call(cmd_args)
     print("\n[#] {} database created for '{}'"
-          .format(aligner, fasta), file=sys.stderr)
+          .format(aligner.upper(), fasta), file=sys.stderr)
 
 
 def is_fasta(some_file):
