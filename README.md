@@ -17,14 +17,14 @@ Run NCBI's `fastq-dump` on one or more accession numbers faster than normal
 ### `notify`
 Automatically send an email to yourself at the end of a (usually long-running) command
 
-### `pblast`
-A parallel implementation of NCBI's BLAST+ suite (faster than their threading implementation for certain db/query size combinations)
+### `palign`
+A parallel implementation of NCBI's BLAST+ suite (faster than their threading implementation for certain db/query size combinations) or a convenience wrapper for DIAMOND
 
 ### `randl`
 Retrieve a random set of lines from a file (FASTA-format aware)
 
 ### `reciprologs`
-Get the best reciprocal BLAST hits between two files
+Get the best reciprocal BLAST/DIAMOND hits between two files
 
 ### `faseq`
 Retrieve one or more sequences (or sub-sequences) from a FASTA file
