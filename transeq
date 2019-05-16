@@ -34,8 +34,9 @@ from biogl import fasta_parse, translate, rev_comp
 
 
 def parse_seq(s):
+    s = s.strip()
     if s.startswith(">"):
-        print(s.strip())
+        print(s)
         return
     if rev_choice is True:
         s = rev_comp(s)
@@ -43,7 +44,8 @@ def parse_seq(s):
         s, 
         verbosity=v_level, 
         phase=phase_choice,
-        stop_char=STOP_CHAR)
+        stop_char=STOP_CHAR,
+        mask=MASK)
     print(aas, flush=True)
 
 
@@ -65,7 +67,8 @@ def parse_file(seqFile):
                 s, 
                 verbosity=v_level, 
                 phase=phase_choice, 
-                stop_char=STOP_CHAR)
+                stop_char=STOP_CHAR,
+                mask=MASK)
             print(">" + h + "\t")
             print(aas, flush=True)
     else:
@@ -78,7 +81,8 @@ def parse_file(seqFile):
                     l, 
                     verbosity=v_level, 
                     phase=phase_choice, 
-                    stop_char=STOP_CHAR)
+                    stop_char=STOP_CHAR,
+                    mask=MASK)
                 print(aas, flush=True)
 
 parser = argparse.ArgumentParser(
@@ -138,7 +142,7 @@ if not seq_input:
 v_level = args.verbosity
 phase_choice = args.phase
 rev_choice = args.reverse_complement
-NO_MASK = args.no_mask
+MASK = not args.no_mask
 STOP_CHAR = args.stop_character
 
 try:
