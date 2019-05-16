@@ -86,11 +86,21 @@ parser.add_argument(
     metavar='n',
     type=int,
     help='The size of the sample to retrieve.')
+parser.add_argument(
+    '-s',
+    '--seed',
+    help='Seed value for the pseudo-random algorithm',
+    type=int)
 
 args = parser.parse_args()
 
 INFILE = args.input_file
 SAMPLE_N = args.sample_size
+SEED = args.seed
+
+# reproducible selection process
+if SEED:
+    random.seed(SEED)
 
 # Get a count of all the lines (or header) in the file
 TOTAL_LINES = count_lines(INFILE)
