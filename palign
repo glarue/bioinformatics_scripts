@@ -50,7 +50,7 @@ from multiprocessing import Pool, cpu_count
 from itertools import chain
 from functools import partial
 from math import ceil, log
-from biogl import fasta_parse, get_runtime, translate
+from biogl import fasta_parse, get_runtime, translate, is_fasta
 
 
 def abbreviate(name, delimiter="."):
@@ -121,17 +121,6 @@ def make_db(fasta, aligner, db_type="nucleotide"):
     subprocess.call(cmd_args)
     print("\n[#] {} database created for '{}'"
           .format(aligner.upper(), fasta), file=sys.stderr)
-
-
-def is_fasta(some_file):
-    with open(some_file) as f:
-        for l in f:
-            if l.startswith("#"):
-                continue
-            if l.startswith(">"):
-                return True
-            else:
-                return False
 
 
 def seq_type(fasta):
@@ -432,9 +421,9 @@ parser.add_argument(
     '-p',
     '--parallel_processes',
     help=(
-        'run the alignment step using multiple parallel processes; '
-        'if unspecified, will use half of available system CPUs'),
-    type=int
+        'run the alignment step using multiple parallel processes'),
+    type=int,
+    default=1
 )
 parser.add_argument(
     '-s',
@@ -501,20 +490,21 @@ OUT_FORMAT = args.output_format
 NO_AUTO = args.no_auto_format
 OVERWRITE = args.clobber_db
 
-# assume if THREADS is specified alone, the user wants
-# to replace parallelism with threading rather than 
-# blowing up the CPU count to (cores/2) * THREADS
-if not PARALLEL and THREADS:
-    SINGLE = True
-elif not PARALLEL and not THREADS:
-    PARALLEL = round(cpu_count() / 2)
+# # assume if THREADS is specified alone, the user wants
+# # to replace parallelism with threading rather than 
+# # blowing up the CPU count to (cores/2) * THREADS
+# if not PARALLEL and THREADS:
+#     SINGLE = True
+# elif not PARALLEL:
+#     SINGLE = True
 
 run_files = {'query': args.query, 'subject': args.subject}
 
 if not NO_AUTO:
     for ftype, fn in run_files.items():
-        if not is_fasta(fn):
-            run_files[ftype] = make_fasta(fn)
+        if os.path.isfile(fn):
+            if not is_fasta(fn):
+                run_files[ftype] = make_fasta(fn)
 
 SUBJECT = run_files['subject']
 QUERY = run_files['query']
