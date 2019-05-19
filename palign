@@ -19,8 +19,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -p PARALLEL_PROCESSES, --parallel_processes PARALLEL_PROCESSES
                         run the alignment step using multiple parallel
-                        processes; if unspecified, will use half of available
-                        system CPUs (default: None)
+                        processes (default: 1)
   -s, --single          disable parallel processing (default: False)
   -f OUTPUT_FORMAT, --output_format OUTPUT_FORMAT
                         integer output format for alignment results (default:
@@ -39,6 +38,7 @@ optional arguments:
                         already present (default: False)
   --clobber_db          create new database even if one already exists
                         (default: False)
+
 """
 
 import sys
