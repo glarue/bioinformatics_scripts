@@ -255,6 +255,11 @@ def get_coding_seq(seq, coord_list, introns=False):
     seq_list = []
     for coord, tag in sorted(coord_list):
         chunk = get_subseq(seq, *coord)
+        if introns is True and tag == 'exon':
+            # ensure that exonic sequence is upper case if introns
+            # are being included to avoid lowercase characters in 
+            # the original genome file being confused for introns
+            chunk = chunk.upper()
         if tag == 'intron':
             chunk = chunk.lower()
             if INTRON_LENGTH and len(chunk) > INTRON_LENGTH:
@@ -290,10 +295,11 @@ def format_output(
     length = str(len(seq))
     gene = t_info['parent']
     if gene is None: 
-        gene = '?'
+        gene = t_name
     header_bits = [t_name, gene, region, strand, span, length]
     if verbose is True:
-        coord_string = ','.join(['-'.join(list(map(str, c))) for c in sorted(seq_coords)])
+        coord_string = ','.join(
+            ['-'.join(list(map(str, c))) for c in sorted(seq_coords)])
         header_bits.append(coord_string)
     header = '\t'.join(header_bits)
 
