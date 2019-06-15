@@ -5,6 +5,8 @@ These Python scripts are relatively well-documented and battle tested, and may b
 __Note:__ Some scripts require the [biogl](https://github.com/glarue/biogl) module to function properly; do 
 `git clone --recursive https://github.com/glarue/bioinformatics_scripts.git` to pull the `biogl` directory as well
 
+## Usage information
+
 - [cdseq](#cdseq) | Extract transcript/coding sequences from a genome using an annotation file
 - [climail](#climail) | Send an email over SSL from the command line
 - [cmdlog](#cmdlog) | Log a shell commmand with optional note
