@@ -121,7 +121,15 @@ def fetch_sra(acc, overwrite=False):
     sra_path = '/sra/sra-instant/reads/ByRun/sra/{}'.format(relative_path)
     full_path = base_path + sra_path
 
-    subprocess.run(['wget', full_path, '-O', sra_filename])
+    # old address style first
+    ret_val = subprocess.run(['wget', full_path, '-O', sra_filename]).returncode
+    if ret_val != 0:
+        print(
+            '[!] Could not find SRA file at {}'
+            '\nTrying alternative'.format(full_path)
+        )
+        full_path = 'https://sra-download.ncbi.nlm.nih.gov/sos/sra-pub-run-1/{}/{}.1'.format(acc, acc)
+        ret_val = subprocess.run(['wget', full_path, '-O', sra_filename]).returncode
 
     return sra_filename
 
@@ -249,6 +257,8 @@ start_time = time.time()
 for acc in accs:
     if '-X' not in extra_args:
         acc_filename = fetch_sra(acc, args.overwrite)
+        if acc_filename is None:
+            sys.exit('[!] Could not fetch SRA file; exiting now.')
         sra_files.append(acc_filename)
     else:
         # we don't want to pre-fetch SRA since we're
