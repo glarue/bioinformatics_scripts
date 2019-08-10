@@ -41,8 +41,6 @@ if strings:
     except st.StatisticsError:  # single value
         s_stdev = 'N/A'
     s_values = [s_count, s_max, s_min, s_sum, s_mean, s_median, s_stdev]
-    
-
 
 properties = ['count', 'max', 'min', 'sum', 'mean', 'median', 'stdev']
 
