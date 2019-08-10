@@ -46,7 +46,7 @@ from collections import defaultdict
 from operator import itemgetter
 from math import floor
 from biogl import (
-    GxfParse, flex_open,fasta_parse, translate, rev_comp, get_runtime)
+    GxfParse, flex_open, fasta_parse, translate, rev_comp, get_runtime)
 
 
 def get_subseq(region_seq, start, stop):
@@ -59,6 +59,7 @@ def get_subseq(region_seq, start, stop):
 
 
 def get_transcripts(gff, child_type):
+    all_child_types = ('cds', 'exon')
     transcripts = defaultdict(dict)
     feature_info = defaultdict(dict)
     grandparents = defaultdict(dict)
@@ -69,11 +70,10 @@ def get_transcripts(gff, child_type):
         for ln, line in enumerate(annot):
             feat = None
             try:
-                # feat = GFFLineInfo(line, ln)
                 feat = GxfParse(line, ln)
             except TypeError:
                 continue
-            if feat.feat_type != child_type:
+            if feat.feat_type not in all_child_types:
                 info_dict = {
                     'name': feat.name,
                     'strand': feat.strand,
@@ -114,7 +114,7 @@ def get_transcripts(gff, child_type):
                             'name': parent,
                             'inferred': True,
                             'parent': feat.grandparent,
-                            'coords': None
+                            'coords': None,
                         }
                     transcripts[region][parent] = {
                         'info': parent_info,
@@ -143,10 +143,13 @@ def get_transcripts(gff, child_type):
             if not tr['children']:
                 continue
             tr['info']['length'] = coding_length(tr['children'])
-            if tr['info']['inferred']:  # need to infer coords from children
-                min_coord = min([e[0] for e in tr['children']])
-                max_coord = max([e[1] for e in tr['children']])
-                tr['info']['coords'] = (min_coord, max_coord)
+            # always use the min/max child coordinates to report sequence
+            # coordinates in output
+            
+            # if tr['info']['inferred']:  # need to infer coords from children
+            min_coord = min([e[0] for e in tr['children']])
+            max_coord = max([e[1] for e in tr['children']])
+            tr['info']['coords'] = (min_coord, max_coord)
             # use child grandparent info for transcripts without preexisting
             # parent info (if available)
             if name in grandparents[region] and tr['info']['parent'] == name:
