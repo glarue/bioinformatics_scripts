@@ -34,6 +34,14 @@ optional arguments:
                         truncate sequence to the nearest even integer <=
                         {integer} (equally from both ends)
 """
+
+# authorship information
+__author__ = 'Graham E. Larue'
+__maintainer__ = "Graham E. Larue"
+__email__ = 'egrahamlarue@gmail.com'
+__license__ = 'GPL'
+
+
 import sys
 import argparse
 from math import floor

@@ -41,6 +41,12 @@ optional arguments:
 
 """
 
+# authorship information
+__author__ = 'Graham E. Larue'
+__maintainer__ = "Graham E. Larue"
+__email__ = 'egrahamlarue@gmail.com'
+__license__ = 'GPL'
+
 import sys
 import subprocess
 import os

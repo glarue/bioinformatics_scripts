@@ -6,6 +6,13 @@ args associated with any files generated to a log
 file in the directory where the files were made.
 
 """
+
+# authorship information
+__author__ = 'Graham E. Larue'
+__maintainer__ = "Graham E. Larue"
+__email__ = 'egrahamlarue@gmail.com'
+__license__ = 'GPL'
+
 import sys
 import os
 from os import listdir
