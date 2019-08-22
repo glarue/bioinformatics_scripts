@@ -157,4 +157,5 @@ for query, hits in sorted(hitdict.items()):
 
 runtime = get_runtime(started)
 
-sys.exit("[#] Processed {} hits in {}".format(processed, runtime))
+print("[#] Processed {} hits in {}".format(processed, runtime), file=sys.stderr)
+sys.exit(0)
