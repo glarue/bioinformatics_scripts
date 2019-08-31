@@ -38,33 +38,12 @@ import subprocess
 import time
 import os
 import argparse
-from collections import defaultdict
+import tempfile
 import smtplib
+from biogl import get_runtime
+from collections import defaultdict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
-
-def get_runtime(start_time, p=3):
-    """
-    Takes a start time and optional decimal precision p,
-    returns a string of the total run-time until current
-    time with appropriate units.
-
-    """
-    total = time.time() - start_time  # starts with seconds
-    divided = total/60.0
-    if divided < 2:
-        run_time = total
-        units = "seconds"
-    elif divided < 60:
-        run_time = divided
-        units = "minutes"
-    else:
-        run_time = divided/60.0
-        units = "hours"
-    rounded = round(run_time, p)
-
-    return "{} {}".format(rounded, units)
 
 
 def names_from_config(config):
@@ -73,7 +52,7 @@ def names_from_config(config):
     return a dictionary of names and emails.
 
     Config format for users is: user    name    email
-    
+
     """
     user_info = defaultdict(dict)
     index = 1
@@ -96,7 +75,7 @@ def get_config_info(config):
     """
     Checks config for necessary information and prompts for
     additional info as needed.
-    
+
     """
     config_info = {}
     with open(config) as conf:
@@ -117,7 +96,7 @@ def get_config_info(config):
         (3, 'port'): 'Server port for outgoing mail over SSL (usually 587)'
     }
     missing_info = {
-        k: v for k, v in info_prompts.items() 
+        k: v for k, v in info_prompts.items()
         if k[1] not in config_info.keys()}
     if missing_info:
         print('Please provide the following server config info: ')
@@ -130,13 +109,13 @@ def get_config_info(config):
         if should_write.lower() == 'y':
             write_config_info(config, config_info)
             print('Information written to \'{}\''.format(config))
-    
+
     return config_info
 
 
 def write_config_info(config, info):
     """
-    Updates info in config with dict >info<, maintaining 
+    Updates info in config with dict >info<, maintaining
     existing information unless overridden by >info<.
 
     """
@@ -175,7 +154,7 @@ def email_from_config(config):
     prompts the user to pick. Allows user to add new name to config.
 
     Returns an email address.
-    
+
     """
     user_dict = names_from_config(config)
     if not user_dict:
@@ -204,7 +183,7 @@ def email_from_config(config):
 def add_replace_email(name, email, config):
     """
     Replaces the >email< for >name< in >config< in place.
-    
+
     """
     new_config = '{}.temp'.format(config)
     replaced = False
@@ -226,13 +205,13 @@ def get_user_info():
     user_name = input('Name to add to config: ')
     user_email = input('Email address for user \'{}\': '.format(user_name))
 
-    return (user_name, user_email) 
-                
+    return (user_name, user_email)
+
 
 def add_name(name, email, config):
     """
     Adds a new name to the config file.
-    
+
     """
     current_names = names_from_config(config)
     if name in current_names:
@@ -266,7 +245,8 @@ def send_ssl_mail(
         port,
         password,
         subject=None,
-        body=None):
+        html_body=None,
+        plain_body=None):
     """
     Sends an email via notify@roylab.science, with optional subject-line
     and body arguments.
@@ -274,13 +254,15 @@ def send_ssl_mail(
     Adapted from http://naelshiab.com/tutorial-send-email-python/
 
     """
-    msg = MIMEMultipart()
+    msg = MIMEMultipart('alternative')
     msg['From'] = from_address
     msg['To'] = to_address
     if subject:
         msg['Subject'] = subject
-    if body:
-        msg.attach(MIMEText(body, 'plain'))
+    if plain_body:
+        msg.attach(MIMEText(plain_body, 'plain'))
+    if html_body:
+        msg.attach(MIMEText(html_body, 'html'))
     try:
         server = smtplib.SMTP_SSL(server_address, port)
     except smtplib.SMTPConnectError:
@@ -303,8 +285,7 @@ def send_ssl_mail(
     if not success:
         sys.exit("{} error: connection to server could not be established".
                  format(sys.argv[0]))
-    text = msg.as_string()
-    server.sendmail(from_address, to_address, text)
+    server.sendmail(from_address, to_address, msg.as_string())
     server.quit()
 
 
@@ -328,6 +309,14 @@ parser.add_argument(
     help='the email address to notify'
 )
 parser.add_argument(
+    '-o',
+    '--send_output',
+    action='store_true',
+    help=(
+        'send any stdout/stderr messages in the body of the email '
+        '(limited to 5 MB)')
+)
+parser.add_argument(
     '--add_email',
     help='add or change an email address in the config file',
     action='store_true'
@@ -346,6 +335,7 @@ parser.add_argument(
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
+SIZE_LIMIT = 5000
 SCRIPT_HOME = os.path.dirname(os.path.realpath(sys.argv[0]))
 HOME_DIR = os.path.expanduser('~')
 CONFIG = os.path.join(HOME_DIR, '.notify.config')
@@ -368,6 +358,8 @@ if args.email:
 else:  # use config
     TARGET_EMAIL = email_from_config(CONFIG)
 
+SEND_OUTPUT = args.send_output
+
 # Make sure we have a correct email address to send to
 if "@" not in TARGET_EMAIL:
     sys.exit("Email address missing '@' symbol. Exiting.")
@@ -389,8 +381,33 @@ SHELL = subprocess.check_output('echo $SHELL', shell=True, universal_newlines=Tr
 # Run external script
 start_time = time.time()
 run_dir = os.getcwd()
-return_code = subprocess.call(CMD_STRING, shell=True, executable=SHELL)
-run_time = get_runtime(start_time)
+
+if SEND_OUTPUT:
+    tmpf = tempfile.TemporaryFile()
+    process_info = subprocess.run(
+        CMD_STRING,
+        shell=True,
+        executable=SHELL,
+        universal_newlines=True,
+        stdout=tmpf,
+        stderr=subprocess.STDOUT)
+
+    run_time = get_runtime(start_time)
+
+    tmpf.seek(0)
+    for l in tmpf:
+        sys.stdout.write(l.decode('utf-8'))
+
+else:
+    process_info = subprocess.run(
+        CMD_STRING,
+        shell=True,
+        executable=SHELL,
+        universal_newlines=True)
+
+    run_time = get_runtime(start_time)
+
+return_code = process_info.returncode
 
 # For list-style format of email
 result = return_code
@@ -400,7 +417,7 @@ host = subprocess.check_output(["hostname"])
 tstring = "%m-%d-%y@%H:%M"
 sys_time = '[{}]'.format(time.strftime(tstring))
 
-# format the email subject line depending on provided info 
+# format the email subject line depending on provided info
 if not host:
     host = ""
 else:
@@ -417,12 +434,35 @@ host_prefix = '{}{}'.format(host, id_string)
 msg_subject = "{}: '{}' completed {}".format(host_prefix, REF_NAME, sys_time)
 
 # Completion message
-msg_body = "\n".join([
-    "Command-line arguments: {}".format(CMD_STRING),
-    "Total runtime: {}".format(run_time),
-    "Return value: {}".format(result),
-    "Location: {}".format(run_dir)
-    ])
+msg_vars = [CMD_STRING, run_time, result, run_dir]
+msg_labels = [
+    'Arguments',
+    'Runtime',
+    'Return value',
+    'Location'
+]
+
+output_bits = None
+
+if SEND_OUTPUT:
+    tmpf.seek(0)
+    v_output = tmpf.read(SIZE_LIMIT).decode('utf-8')
+    output_bits = ('Output', v_output)
+    tmpf.close()
+
+
+msg_pairs = [tuple(map(str, pair)) for pair in zip(msg_labels, msg_vars)]
+html_pairs = [': '.join(['<b>{}</b>'.format(i), j]) for i, j in msg_pairs]
+if SEND_OUTPUT:
+    html_pairs.append('<b>{}:</b><br />{}'.format(*output_bits))
+    # '<br />'.join([[0], msg_pairs[-1][1]]))
+html_body = '<br />'.join(html_pairs)
+html_body = '<pre>{}</pre>'.format(html_body)
+
+plain_pairs = [': '.join(p) for p in msg_pairs]
+if SEND_OUTPUT:
+    plain_pairs.append('\n'.join(output_bits))
+plain_body = '\n'.join(plain_pairs)
 
 send_args = {
     'from_address': config_info['from_address'],
@@ -431,7 +471,8 @@ send_args = {
     'port': config_info['port'],
     'password': config_info['password'],
     'subject': msg_subject,
-    'body': msg_body}
+    'html_body': html_body,
+    'plain_body': plain_body}
 
 send_ssl_mail(**send_args)
 
