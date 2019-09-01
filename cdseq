@@ -48,11 +48,12 @@ __license__ = 'GPL'
 import sys
 import argparse
 import time
-from collections import defaultdict
-from operator import itemgetter
+from collections import defaultdict, namedtuple, Counter
+from itertools import zip_longest
+from operator import itemgetter, attrgetter
 from math import floor
 from biogl import (
-    GxfParse, flex_open, fasta_parse, translate, rev_comp, get_runtime)
+    GxfParse, flex_open, fasta_parse, translate, rev_comp, get_runtime, window)
 
 
 def get_subseq(region_seq, start, stop):
@@ -127,12 +128,8 @@ def get_transcripts(gff, child_type):
                         'children': set()}
                 if feat.grandparent and parent not in grandparents[region]:
                         grandparents[region][parent] = feat.grandparent
-                    # parent_record = transcripts[region][parent]
-                    # existing_gp = parent_record['info']['parent']
-                    # if existing_gp != feat.grandparent:
-                    #     parent_record['info']['parent'] = feat.grandparent
                 tr = transcripts[region][parent]
-                tr['children'].add((start, stop))
+                tr['children'].add(feat)
                 regions_with_content.add(region)
 
     if orphans:
@@ -153,8 +150,8 @@ def get_transcripts(gff, child_type):
             # coordinates in output
             
             # if tr['info']['inferred']:  # need to infer coords from children
-            min_coord = min([e[0] for e in tr['children']])
-            max_coord = max([e[1] for e in tr['children']])
+            min_coord = min([c.start for c in tr['children']])
+            max_coord = max([c.stop for c in tr['children']])
             tr['info']['coords'] = (min_coord, max_coord)
             # use child grandparent info for transcripts without preexisting
             # parent info (if available)
@@ -237,33 +234,66 @@ def finalize_transcripts(transcript_dict):
     return finalized
 
 
-def coding_length(coords):
-    return sum([abs(stop-start) + 1 for start, stop in coords])
+def coding_length(feats):
+
+    return sum([abs(f.stop-f.start) + 1 for f in feats])
 
 
-def get_intron_coords(coord_list):
+def between(a, b):
+    '''
+    Get interval between two other intervals, regardless
+    of supplied ordering.
+    
+    '''
+    start = min(map(max, [a, b]))
+    stop = max(map(min, [a, b]))
+    
+    return (start + 1, stop - 1)
+
+
+def get_introns(feats):
     '''
     Generate tagged intron coordinates from a list of exon/CDS
     coordinates.
 
     '''
-    i_starts = [c[1] + 1 for c, tag in coord_list[:-1]]
-    i_stops = [c[0] - 1 for c, tag in coord_list[1:]]
-    i_tags = ['intron'] * len(i_starts)
-    intron_coords = list(zip(zip(i_starts, i_stops), i_tags))
+    strand = consensus_strand(feats)[0]
+    introns = []
+    for up, down in window(feats, n=2):
+        i_start, i_stop = between(
+            (up.start, up.stop), (down.start, down.stop))
+        i_ln = sum([up.line_number, down.line_number]) / 2
+        i = feature_obj(
+            feat_type='intron',
+            start=i_start, 
+            stop=i_stop, 
+            line_number=i_ln,
+            strand=strand
+        )
+        introns.append(i)
 
-    return intron_coords
+    return introns
 
 
-def get_coding_seq(seq, coord_list, introns=False):
-    coord_list = sorted(coord_list)
-    coord_list = [(c, 'exon') for c in coord_list]    
-    if introns is not False:
-        intron_coords = get_intron_coords(coord_list)
-        coord_list.extend(intron_coords)
+def consensus_strand(features):
+    consensus_strand = Counter((f.strand for f in features)).most_common(2)
+
+    return [s[0] for s in consensus_strand]
+
+
+def get_coding_seq(region_seq, features, introns=False):
+    if introns is not False and len(features) > 1:
+        intron_feats = get_introns(features)
+        # interleave introns into other features in order of creation
+        features = [
+            f for pair in 
+            zip_longest(features, intron_feats) for f in pair if f]
     seq_list = []
-    for coord, tag in sorted(coord_list):
-        chunk = get_subseq(seq, *coord)
+    for f in features:
+        tag = f.feat_type
+        chunk = get_subseq(region_seq, f.start, f.stop)
+        if f.strand == '-':
+            chunk = rev_comp(chunk)
         if introns is True and tag == 'exon':
             # ensure that exonic sequence is upper case if introns
             # are being included to avoid lowercase characters in 
@@ -279,6 +309,35 @@ def get_coding_seq(seq, coord_list, introns=False):
     return full_seq
 
 
+def sorted_in_coding_direction(obj_list):
+    """
+    Sorts a list of GenomeFeature objects by their
+    stop/start attribute, depending on the value of
+    their strand attributes.
+
+    """
+    strands = consensus_strand(obj_list)
+    if len(strands) > 1:  # can't pick single orientation
+        print(
+            "WARNING: mixed strands found in provided feature list "
+            "(parent feature: '{}'); "
+            "defaulting to feature order in source file".format(next(iter(obj_list)).parent),
+            file=sys.stderr)
+        # default to sorting for + strand if mixed strands
+        return sorted(obj_list, key=attrgetter('line_number'))
+    else:
+        strand = strands[0]
+        if strand == "-":
+            # Want to sort by "first" coord, which for reverse-
+            # strand features is the stop
+            coord = "stop"
+            rev = True
+        else:
+            coord = "start"
+            rev = False
+        return sorted(obj_list, key=attrgetter(coord), reverse=rev)
+
+
 def format_output(
     region_seq, 
     t_dict, 
@@ -291,15 +350,12 @@ def format_output(
     region = t_info['region']
     span = ':'.join(map(str, t_info['coords']))
     if non_coding is True:
-        seq_coords = [t_info['coords']]
+        feats = [t_info['coords']]
     else:
-        seq_coords = t_dict['children']
-    seq = get_coding_seq(region_seq, seq_coords, introns=introns)
-    if strand == '-':
-        # seq = reverse_complement(seq)
-        seq = rev_comp(seq)
+        feats = t_dict['children']
+    feats = sorted_in_coding_direction(feats)
+    seq = get_coding_seq(region_seq, feats, introns=introns)
     if TRANSLATE is True:
-        # seq = translate_seq(seq)
         seq = translate(seq)
     length = str(len(seq))
     gene = t_info['parent']
@@ -308,7 +364,7 @@ def format_output(
     header_bits = [t_name, gene, region, strand, span, length]
     if verbose is True:
         coord_string = ','.join(
-            ['-'.join(list(map(str, c))) for c in sorted(seq_coords)])
+            ['-'.join(map(str, [f.start, f.stop])) for f in feats])
         header_bits.append(coord_string)
     header = '\t'.join(header_bits)
 
@@ -411,6 +467,9 @@ else:
     child_type = 'cds'
 
 child_types = ('exon', 'cds')
+
+feature_obj = namedtuple(
+    'feature', ['feat_type', 'start', 'stop', 'strand', 'line_number'])
 
 transcripts, child_found = get_transcripts(ANNOTATION, child_type)
 
