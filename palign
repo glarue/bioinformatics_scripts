@@ -327,8 +327,9 @@ def parallel_alignment(
     block_size = ceil(count / PARALLEL)
     # change padding depth according to total number of chunks
     zero_pad = ceil(log(PARALLEL + 1, 10))
-    chunk_name_scheme = '{0}.{1:0{2}}.chunk'
-    chunk_name = chunk_name_scheme.format(query, 1, zero_pad)
+    process_id = os.getpid()  # keep temp files on simultaneous runs separate
+    chunk_name_scheme = '{0}.{1}.{2:0{3}}.chunk'
+    chunk_name = chunk_name_scheme.format(query, process_id, 1, zero_pad)
     chunk = open(chunk_name, 'w')
     chunked = [chunk_name]
     tally = 1
@@ -338,7 +339,7 @@ def parallel_alignment(
             tally += 1
             # order matters here
             chunk.close()
-            chunk_name = chunk_name_scheme.format(query, tally, zero_pad)
+            chunk_name = chunk_name_scheme.format(query, process_id, tally, zero_pad)
             chunked.append(chunk_name)
             chunk = open(chunk_name, 'w')
             chunk.write('>{}\n{}\n'.format(h, s))                        
@@ -352,7 +353,7 @@ def parallel_alignment(
         out_name = '{}-vs-{}.{}'.format(
             abbreviate(query), abbreviate(subject), output_suffix)
     filenames = [
-        '{0}.{1:0{2}}.tmp'.format(out_name, i, zero_pad) 
+        '{0}.{1}.{2:0{3}}.tmp'.format(out_name, process_id, i, zero_pad) 
         for i in range(1, len(chunked) + 1)
         ]
     # use apply_async instead of starmap to allow messages
@@ -366,7 +367,11 @@ def parallel_alignment(
     results = [r.get() for r in results]
 
     # clean up chunk files
-    [os.remove(f) for f in chunked]
+    for f in chunked:
+        try:
+            os.remove(f)
+        except FileNotFoundError:
+            continue
 
     return results
 
