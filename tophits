@@ -111,21 +111,24 @@ total_hits = 0
 # Do the data analysis at once or trimming as we go
 with open(BLASTFILE) as blast:
     for hit in blast:
-        bits = hit.strip().split('\t')
-        query = bits[0]
-        subject = bits[1]
-        e_val = float(bits[-2])
-        if query == subject and REDUNDANT_IDS is False:
+        try:
+            bits = hit.strip().split('\t')
+            query = bits[0]
+            subject = bits[1]
+            e_val = float(bits[-2])
+            if query == subject and REDUNDANT_IDS is False:
+                continue
+            if EVALUE and e_val > EVALUE:
+                continue
+            bitscore = float(bits[-1])
+            # Attach the bitscore and subject to allow for sorting at the end
+            index_tuple = (hit.strip(), bitscore, subject)
+            hitdict[query].append(index_tuple)
+            if MEM_REDUCE:  # ~50% slower, ~200x less memory usage
+                hitdict[query] = sorted(hitdict[query], key=lambda x: x[1], reverse=True)[:N]
+            total_hits += 1
+        except:  # weird line formatting
             continue
-        if EVALUE and e_val > EVALUE:
-            continue
-        bitscore = float(bits[-1])
-        # Attach the bitscore and subject to allow for sorting at the end
-        index_tuple = (hit.strip(), bitscore, subject)
-        hitdict[query].append(index_tuple)
-        if MEM_REDUCE:  # ~50% slower, ~200x less memory usage
-            hitdict[query] = sorted(hitdict[query], key=lambda x: x[1], reverse=True)[:N]
-        total_hits += 1
 
 # The {file} argument directs output to standard error rather than
 # standard out, to maintain clean redirection of the filtered query
