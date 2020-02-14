@@ -334,7 +334,7 @@ parser.add_argument(
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
-SIZE_LIMIT = 5e5  # in characters
+SIZE_LIMIT = int(5e5)  # in characters
 SCRIPT_HOME = os.path.dirname(os.path.realpath(sys.argv[0]))
 HOME_DIR = os.path.expanduser('~')
 CONFIG = os.path.join(HOME_DIR, '.notify.config')
