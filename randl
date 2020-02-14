@@ -29,6 +29,7 @@ import mmap
 from biogl import fasta_parse
 from collections import deque
 
+#TODO update with reservoir sampling function
 
 def check_fasta(f):
     """
