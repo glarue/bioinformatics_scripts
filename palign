@@ -358,20 +358,24 @@ def parallel_alignment(
         ]
     # use apply_async instead of starmap to allow messages
     # to print to screen without clobbering each other
-    results = []
-    for pair in zip(chunked, filenames):
-        results.append(pool.apply_async(align, args=pair))
-        time.sleep(.05)
-    pool.close()
-    pool.join()
-    results = [r.get() for r in results]
+    try:
+        results = []
+        for pair in zip(chunked, filenames):
+            results.append(pool.apply_async(align, args=pair))
+            time.sleep(.05)
+        pool.close()
+        pool.join()
+        results = [r.get() for r in results]
 
-    # clean up chunk files
-    for f in chunked:
-        try:
-            os.remove(f)
-        except FileNotFoundError:
-            continue
+        # clean up chunk files
+        for f in chunked:
+            try:
+                os.remove(f)
+            except FileNotFoundError:
+                continue
+    finally:
+        pool.close()
+        pool.join()
 
     return results
 
@@ -501,15 +505,18 @@ OUT_FORMAT = args.output_format
 NO_AUTO = args.no_auto_format
 OVERWRITE = args.clobber_db
 
-# # assume if THREADS is specified alone, the user wants
-# # to replace parallelism with threading rather than 
-# # blowing up the CPU count to (cores/2) * THREADS
-# if not PARALLEL and THREADS:
-#     SINGLE = True
-# elif not PARALLEL:
-#     SINGLE = True
+run_files = {
+    'query': os.path.realpath(os.path.expanduser(args.query)),
+    'subject': os.path.realpath(os.path.expanduser(args.subject))
+    }
 
-run_files = {'query': args.query, 'subject': args.subject}
+not_files = []
+for k, f in run_files.items():
+        if not os.path.isfile(f):
+                not_files.append(f)
+if not_files:
+    sys.exit(
+        "[!] ERROR: can't find input file(s):\n{}".format('\n'.join(not_files)))
 
 if not NO_AUTO:
     for ftype, fn in run_files.items():
