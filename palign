@@ -373,6 +373,9 @@ def parallel_alignment(
                 os.remove(f)
             except FileNotFoundError:
                 continue
+    except KeyboardInterrupt:
+        print('\n[!] Terminating pool due to user interrupt', file=sys.stderr)
+        pool.terminate()
     finally:
         pool.close()
         pool.join()
