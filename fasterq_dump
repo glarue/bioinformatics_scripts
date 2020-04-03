@@ -1,24 +1,27 @@
 #!/usr/bin/python3
 
 """
-usage: fasterq_dump.py [-h] [-f FILE] [-k] [accessions [accessions ...]]
+usage: fasterq_dump [-h] [-f FILE] [-k] [-t] [-w] [-m] [-u {all,curl,wget,prefetch}] [accessions [accessions ...]]
 
-A program to run fastq-dump sequentially on a list of accession numbers. Will
-automatically detect if reads are single- or paired-end and will run fastq-
-dump accordingly, adding proper ID suffixes as needed. Accession numbers may
-be provided directly, or in a file using the -f option. If provided directly,
-accessions may be comma or space separated, or hyphen-separated to specify a
-range, e.g. SRR123455, SRR123456, SRR123457 or SRR123455-SRR123457
+A program to run fastq-dump sequentially on a list of accession numbers. Will automatically detect if reads are single- or paired-end and will
+run fastq-dump accordingly, adding proper ID suffixes as needed. Accession numbers may be provided directly, or in a file using the -f option.
+If provided directly, accessions may be comma or space separated, or hyphen-separated to specify a range, e.g. SRR123455, SRR123456, SRR123457
+or SRR123455-SRR123457. Any other args will be passed to fastq-dump.
 
 positional arguments:
-  accessions            List of SRA accession numbers (e.g. SRR123456
-                        SRR123457)
+  accessions            Space, comma or hyphen (range) separated list of SRA accession numbers (e.g. SRR123456 SRR123457 or SRR123456-SRR123460)
 
 optional arguments:
   -h, --help            show this help message and exit
   -f FILE, --file FILE  File with SRA accession numbers on separate lines
   -k, --keep_sra_files  Keep SRA files after dumping to FASTQ format
-
+  -t, --trinity_compatible_ids
+                        rename read IDs in paired-end data to ensure downstream compatibility with Trinity
+  -w, --overwrite       overwrite any matching local SRA files
+  -m, --manual          do not auto-detect read type (manual entry of e.g. "--split-files" required)
+  -u {all,curl,wget,prefetch}, --utilities {all,curl,wget,prefetch}
+                        specify the utilities(s) to use to fetch the SRA file(s) (default: all)
+                        
 """
 
 # authorship information
@@ -187,30 +190,44 @@ def fetch_prefetch(acc):
         return fn
 
 
-def fetch_direct(acc, protocols=['curl', 'wget']):
+def fetch_direct(acc, protocols=['wget', 'curl']):
     fn = '{}.sra'.format(acc)
-    sra_path = subprocess.run(
-        ['srapath', acc], 
-        check=True, 
-        stdout=subprocess.PIPE, 
-        universal_newlines=True
-    ).stdout.strip()
+    try:
+        sra_path = subprocess.run(
+            ['srapath', acc], 
+            check=True, 
+            stdout=subprocess.PIPE, 
+            universal_newlines=True
+        ).stdout.strip()
+    except FileNotFoundError: # utility not installed
+        print(
+            '[!] Unable to source srapath; using old-style URL construction',
+            file=sys.stderr)
+        sra_path = build_sra_path(acc)
+    print('[#] SRA URL: {}'.format(sra_path), file=sys.stderr)
     downloaders = {
-        'curl': ['-L', '--output', fn, sra_path],
+        'curl': ['-f', '-L', '--output', fn, sra_path],
         'wget': ['-O', fn, sra_path]
     }
     ret_val = None
+    total_retries = 2
     for p in protocols:
         d_args = downloaders[p]
         d_cmds = [p] + d_args
-        print('[#] Trying direct download: {}'.format(' '.join(d_cmds)))
-        ret_code = subprocess.run(d_cmds).returncode
-        if ret_code != 0:
-            print('[!] Download command failed')
-            ret_val = None
-        else:            
-            ret_val = fn
-            break
+        retry_n = 1
+        while retry_n <= total_retries and ret_val is None:
+            print(
+                '[#] Trying direct download ({}/{}): {}'.format(
+                    retry_n, total_retries, ' '.join(d_cmds)))
+            ret_code = subprocess.run(d_cmds).returncode
+            if ret_code != 0:
+                print('[!] Download command failed')
+                retry_n += 1
+                ret_val = None
+            else:
+                return fn        
+                # ret_val = fn
+                # break
 
     return ret_val
 
@@ -229,7 +246,7 @@ def fetch_sra(acc, utilities, overwrite=False):
         )
         return local_filename
 
-    # different fetch methods in increasing order of desperation
+    # different fetch methods in order of increasing desperation
     if utilities in ('wget', 'curl'):
         fetch_funcs = [partial(fetch_direct, protocols=[utilities])]
     elif utilities == 'prefetch':
@@ -299,7 +316,8 @@ parser = argparse.ArgumentParser(
     'suffixes as needed. Accession numbers may be provided directly, or '
     'in a file using the -f option. If provided directly, accessions may '
     'be comma or space separated, or hyphen-separated to specify a range, '
-    'e.g. SRR123455, SRR123456, SRR123457 or SRR123455-SRR123457'
+    'e.g. SRR123455, SRR123456, SRR123457 or SRR123455-SRR123457. Any other '
+    'args will be passed to fastq-dump.'
 )
 parser.add_argument(
     'accessions',
@@ -347,7 +365,9 @@ parser.add_argument(
     '-u',
     '--utilities',
     choices=('all', 'curl', 'wget', 'prefetch'),
-    help='specify the utilities(s) to use to fetch the SRA file(s)',
+    help=(
+        'specify the utilities(s) to use to fetch the SRA file(s) '
+        '(default: all)'),
     default='all'
 )
 
@@ -401,8 +421,13 @@ for acc in accs:
         # only getting a subset of the reads
         acc_filename = acc
     read_type = paired_check(acc_filename)
-    print('[#] Detected read type for {}: {}'.format(acc, read_type),
-          file=sys.stderr)
+    if read_type is not None:
+        print(
+            '[#] Detected read type for {}: {}'.format(acc, read_type),
+            file=sys.stderr
+        )
+    else:
+        read_type = 'single'
     cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
     dump_args = shlex.split(cmd)
     print('[#] Running command \'{}\''.format(cmd), file=sys.stderr)
