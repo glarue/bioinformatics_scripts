@@ -34,6 +34,7 @@ import shlex
 import time
 import argparse
 from collections import namedtuple
+from functools import partial
 from itertools import zip_longest
 from biogl import get_runtime
 
@@ -68,6 +69,7 @@ def fastq_parse(fastq):
         fq_meta = fq_meta[0]
         cleaned = "\n".join([fq_id, fq_seq, fq_meta, fq_quality])
         record_info = FqRec(fq_id, fq_seq, fq_meta, fq_quality, full_record, cleaned)
+
         yield record_info
 
 
@@ -82,11 +84,15 @@ def paired_check(acc):
     test_dump = "fastq-dump {} -X 6 --split-files -I --stdout".format(acc)
     test_args = shlex.split(test_dump)
     # stderr of subprocess sent to /dev/null to silence fastq-dump progress output
-    test_process = subprocess.Popen(test_args, stdout=subprocess.PIPE,
-                                    stderr=subprocess.DEVNULL, universal_newlines=True)
+    test_process = subprocess.run(
+        test_args, 
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL, 
+        universal_newlines=True,
+        check=True
+    )
     suffixes = set()
-
-    for rec in fastq_parse(test_process.stdout):
+    for rec in fastq_parse(test_process.stdout.strip().split('\n')):
         # it's safe to just take the last character because of the -I flag
         # in the fastq-dump call
         suffixes.add(rec.id[-1])
@@ -95,25 +101,56 @@ def paired_check(acc):
     elif len(suffixes) == 1:
         read_type = "single"
     else:
+        print(
+            '[!] Read type ambiguous (read suffices: {})'.format(suffixes), 
+            file=sys.stderr)
         read_type = None
+
     return read_type
 
 
-def fetch_sra(acc, overwrite=False):
-    """
-    Grabs an SRA file from NCBI.
+# def fetch_sra(acc, overwrite=False):
+#     """
+#     Grabs an SRA file from NCBI.
 
-    """
-    sra_filename = '{}.sra'.format(acc)
+#     """
+#     sra_filename = '{}.sra'.format(acc)
 
-    # if local file already exists, use it instead
-    if os.path.isfile(sra_filename) and overwrite is False:
-        print(
-            '[#] Using existing SRA file: {}'.format(sra_filename),
-            file=sys.stderr
-        )
-        return sra_filename
+#     # if local file already exists, use it instead
+#     if os.path.isfile(sra_filename) and overwrite is False:
+#         print(
+#             '[#] Using existing SRA file: {}'.format(sra_filename),
+#             file=sys.stderr
+#         )
+#         return sra_filename
 
+#     alpha = acc[:3]
+#     first_six = acc[:6]
+
+#     # build file path to SRA data
+#     base_path = 'ftp://ftp-trace.ncbi.nlm.nih.gov'
+
+#     # pattern of path:
+#     #  /sra/sra-instant/reads/ByRun/sra/{SRR|ERR|DRR}/
+#     # <first 6 characters of accession>/<accession>/<accession>.sra
+#     path_bits = [alpha, first_six, acc, sra_filename]
+#     relative_path = '/'.join(path_bits)
+#     sra_path = '/sra/sra-instant/reads/ByRun/sra/{}'.format(relative_path)
+#     full_path = base_path + sra_path
+
+#     # old address style first
+#     ret_val = subprocess.run(['wget', full_path, '-O', sra_filename]).returncode
+#     if ret_val != 0:
+#         print(
+#             '[!] Could not find SRA file at {}'
+#             '\nTrying alternative'.format(full_path)
+#         )
+#         full_path = 'https://sra-download.ncbi.nlm.nih.gov/sos/sra-pub-run-1/{}/{}.1'.format(acc, acc)
+#         ret_val = subprocess.run(['wget', '--user-agent="Mozilla"', full_path, '-O', sra_filename]).returncode
+
+#     return sra_filename
+
+def build_sra_path(acc):
     alpha = acc[:3]
     first_six = acc[:6]
 
@@ -128,15 +165,84 @@ def fetch_sra(acc, overwrite=False):
     sra_path = '/sra/sra-instant/reads/ByRun/sra/{}'.format(relative_path)
     full_path = base_path + sra_path
 
-    # old address style first
-    ret_val = subprocess.run(['wget', full_path, '-O', sra_filename]).returncode
-    if ret_val != 0:
+    return full_path
+
+
+def local_sra_check(acc):
+    sra_filename = '{}.sra'.format(acc)
+    if os.path.isfile(sra_filename) and os.path.getsize(sra_filename) > 0:
+        return sra_filename
+    else:
+        return False
+
+
+def fetch_prefetch(acc):
+    fn = '{}.sra'.format(acc)
+    cwd = os.getcwd()
+    ret_code = subprocess.run(['prefetch', acc, '-O', cwd, '-o', fn]).returncode
+    if ret_code != 0:
+        print('[!] Downloading {} via prefetch failed'.format(acc))
+        return None
+    else:
+        return fn
+
+
+def fetch_direct(acc, protocols=['curl', 'wget']):
+    fn = '{}.sra'.format(acc)
+    sra_path = subprocess.run(
+        ['srapath', acc], 
+        check=True, 
+        stdout=subprocess.PIPE, 
+        universal_newlines=True
+    ).stdout.strip()
+    downloaders = {
+        'curl': ['-L', '--output', fn, sra_path],
+        'wget': ['-O', fn, sra_path]
+    }
+    ret_val = None
+    for p in protocols:
+        d_args = downloaders[p]
+        d_cmds = [p] + d_args
+        print('[#] Trying direct download: {}'.format(' '.join(d_cmds)))
+        ret_code = subprocess.run(d_cmds).returncode
+        if ret_code != 0:
+            print('[!] Download command failed')
+            ret_val = None
+        else:            
+            ret_val = fn
+            break
+
+    return ret_val
+
+
+def fetch_sra(acc, utilities, overwrite=False):
+    """
+    Grabs an SRA file from NCBI.
+
+    """
+    # if local file already exists, use it instead
+    local_filename = local_sra_check(acc)
+    if local_filename and overwrite is False:
         print(
-            '[!] Could not find SRA file at {}'
-            '\nTrying alternative'.format(full_path)
+            '[#] Using existing SRA file: {}'.format(local_filename),
+            file=sys.stderr
         )
-        full_path = 'https://sra-download.ncbi.nlm.nih.gov/sos/sra-pub-run-1/{}/{}.1'.format(acc, acc)
-        ret_val = subprocess.run(['wget', '--user-agent="Mozilla"', full_path, '-O', sra_filename]).returncode
+        return local_filename
+
+    # different fetch methods in increasing order of desperation
+    if utilities in ('wget', 'curl'):
+        fetch_funcs = [partial(fetch_direct, protocols=[utilities])]
+    elif utilities == 'prefetch':
+        fetch_funcs = [fetch_prefetch]
+    elif utilities == 'all':
+        fetch_funcs = [fetch_prefetch, fetch_direct]
+    else:
+        return None
+    sra_filename = None
+    for f in fetch_funcs:
+        sra_filename = f(acc)
+        if sra_filename is not None:
+            break
 
     return sra_filename
 
@@ -198,7 +304,9 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     'accessions',
     nargs='*',
-    help='Space-separated list of SRA accession numbers (e.g. SRR123456 SRR123457)'
+    help=(
+        'Space, comma or hyphen (range) separated list of SRA '
+        'accession numbers (e.g. SRR123456 SRR123457 or SRR123456-SRR123460)')
 )
 parser.add_argument(
     '-f',
@@ -226,6 +334,22 @@ parser.add_argument(
         'overwrite any matching local SRA files'),
     action='store_true'
 )
+parser.add_argument(
+    '-m',
+    '--manual',
+    action='store_true',
+    help=(
+        'do not auto-detect read type '
+        '(manual entry of e.g. "--split-files" required)'
+    )
+)
+parser.add_argument(
+    '-u',
+    '--utilities',
+    choices=('all', 'curl', 'wget', 'prefetch'),
+    help='specify the utilities(s) to use to fetch the SRA file(s)',
+    default='all'
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -245,14 +369,19 @@ if len(accs) > 25:
         sys.exit('Aborting run.')
 
 # rename ids using fastq-dump's built-in if desired
+shared_args = []
+paired_args = []
+
 if args.trinity_compatible_ids:
     id_arg = ' --defline-seq \'@$ac.$si:$sn[_$rn]/$ri\''
-else:
-    id_arg = ''
+    shared_args.append(id_arg)
+
+if not args.manual:
+    paired_args.append('--split-files')
 
 cmds = {
-    'paired': ('fastq-dump{} --split-files '.format(id_arg)),
-    'single': 'fastq-dump{} '.format(id_arg)
+    'paired': 'fastq-dump {} '.format(' '.join(shared_args + paired_args)),
+    'single': 'fastq-dump {} '.format(' '.join(shared_args))
 }
 
 sra_files = []
@@ -263,7 +392,7 @@ start_time = time.time()
 
 for acc in accs:
     if '-X' not in extra_args:
-        acc_filename = fetch_sra(acc, args.overwrite)
+        acc_filename = fetch_sra(acc, args.utilities, args.overwrite)
         if acc_filename is None:
             sys.exit('[!] Could not fetch SRA file; exiting now.')
         sra_files.append(acc_filename)
@@ -271,7 +400,7 @@ for acc in accs:
         # we don't want to pre-fetch SRA since we're
         # only getting a subset of the reads
         acc_filename = acc
-    read_type = paired_check(acc)
+    read_type = paired_check(acc_filename)
     print('[#] Detected read type for {}: {}'.format(acc, read_type),
           file=sys.stderr)
     cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
