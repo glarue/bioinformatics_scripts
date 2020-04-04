@@ -21,7 +21,7 @@ optional arguments:
   -m, --manual          do not auto-detect read type (manual entry of e.g. "--split-files" required)
   -u {all,curl,wget,prefetch}, --utilities {all,curl,wget,prefetch}
                         specify the utilities(s) to use to fetch the SRA file(s) (default: all)
-                        
+
 """
 
 # authorship information
@@ -182,7 +182,7 @@ def local_sra_check(acc):
 def fetch_prefetch(acc):
     fn = '{}.sra'.format(acc)
     cwd = os.getcwd()
-    ret_code = subprocess.run(['prefetch', acc, '-O', cwd, '-o', fn]).returncode
+    ret_code = subprocess.run(['prefetch', acc, '-O', cwd, '-o', fn, '-p']).returncode
     if ret_code != 0:
         print('[!] Downloading {} via prefetch failed'.format(acc))
         return None
