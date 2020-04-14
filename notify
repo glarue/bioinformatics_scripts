@@ -300,7 +300,11 @@ parser.add_argument(
     'commands',
     metavar='external commands',
     nargs='*',
-    help='External commands to run, including external program call'
+    help=(
+        'External commands to run, including external program call. '
+        'NOTE: for complex commands (e.g. awk + $args), wrapping the '
+        'entire command in double or triple quotes may be necessary'
+    )
 )
 parser.add_argument(
     '-e',
@@ -330,6 +334,12 @@ parser.add_argument(
     help='additional string to include in email subject',
     type=str
 )
+parser.add_argument(
+    '-d',
+    '--dry_run',
+    action='store_true',
+    help='print command that would be executed and exit without running'
+)
 
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
@@ -342,6 +352,13 @@ if not os.path.isfile(CONFIG):
     open(CONFIG, 'w').close()  # hacky!
 
 args = parser.parse_args()
+
+CMDS = args.commands
+
+CMD_STRING = ' '.join(CMDS)
+
+if args.dry_run:
+    sys.exit(CMD_STRING)
 
 if args.view_config:
     view_config(CONFIG)
@@ -366,12 +383,8 @@ if "@" not in TARGET_EMAIL:
 # check other config information
 config_info = get_config_info(CONFIG)
 
-CMDS = args.commands
-
 # assume first argument is external program name
 REF_NAME = CMDS[0]
-
-CMD_STRING = ' '.join(CMDS)
 
 # determine where Bash is located to allow execution of
 # Bash-specific commands (as opposed to the default sh)
