@@ -2,8 +2,14 @@
 
 These Python scripts are relatively well-documented and battle tested, and may be useful to a somewhat wider audience than their author.
 
-__Note:__ Some scripts require the [biogl](https://github.com/glarue/biogl) module to function properly; do 
-`git clone --recursive https://github.com/glarue/bioinformatics_scripts.git` to pull the `biogl` directory as well
+__Note:__ Some scripts require the [biogl](https://github.com/glarue/biogl) module to function properly. If you use `pip`, you can simply do
+
+`python3 -m pip install biogl`
+
+to add the package to your Python install directly. Otherwise, you can pull the local submodule from this repo along with the scripts:
+
+`git clone --recursive https://github.com/glarue/bioinformatics_scripts.git`
+
 
 ## Usage information
 
