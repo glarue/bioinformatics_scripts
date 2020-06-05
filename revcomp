@@ -70,6 +70,10 @@ else:
         seq_input = [seq_input]
 
 MASK = not args.no_mask
+if MASK:
+    MASK = 'N'
+else:
+    MASK = None
 KEEP_LOWER = not args.no_lower
 
 for l in seq_input:
