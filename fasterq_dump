@@ -182,9 +182,21 @@ def local_sra_check(acc):
 def fetch_prefetch(acc):
     fn = '{}.sra'.format(acc)
     cwd = os.getcwd()
+    max_size_kb = '80000000'  # 80 GB
     try:
         ret_code = subprocess.run(
-            ['prefetch', acc, '-O', cwd, '-o', fn, '-p']).returncode
+            [
+                'prefetch', 
+                acc, 
+                '-O', 
+                cwd, 
+                '-o', 
+                fn, 
+                '-p', 
+                '--max-size', 
+                max_size_kb
+            ]
+        ).returncode
     except:
         ret_code = 42
     if ret_code != 0:
