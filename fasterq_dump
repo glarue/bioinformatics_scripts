@@ -39,7 +39,7 @@ import argparse
 from collections import namedtuple
 from functools import partial
 from itertools import zip_longest
-from biogl import get_runtime
+from biogl import get_runtime, recursive_items
 
 # taken directly from https://docs.python.org/3/library/itertools.html#recipes
 def grouper(iterable, n, fillvalue=None):
@@ -156,7 +156,7 @@ def paired_check(acc):
 def build_sra_path(acc):
     alpha = acc[:3]
     first_six = acc[:6]
-
+    sra_filename = '{}.sra'.format(acc)
     # build file path to SRA data
     base_path = 'ftp://ftp-trace.ncbi.nlm.nih.gov'
 
@@ -182,7 +182,11 @@ def local_sra_check(acc):
 def fetch_prefetch(acc):
     fn = '{}.sra'.format(acc)
     cwd = os.getcwd()
-    ret_code = subprocess.run(['prefetch', acc, '-O', cwd, '-o', fn, '-p']).returncode
+    try:
+        ret_code = subprocess.run(
+            ['prefetch', acc, '-O', cwd, '-o', fn, '-p']).returncode
+    except:
+        ret_code = 42
     if ret_code != 0:
         print('[!] Downloading {} via prefetch failed'.format(acc))
         return None
@@ -309,6 +313,20 @@ def clean_args(arguments):
     return final_args
 
 
+def fastq_exists(acc, paired=False):
+    if paired:
+        fns = ['{}_1.fastq'.format(acc), '{}_2.fastq'.format(acc)]
+    else:
+        fns = ['{}.fastq'.format(acc)]
+    existing_files = recursive_items(pattern='{}.*fastq.*'.format(acc))
+    files_already_present = True
+    for f in fns:
+        if not any(f in e for e in existing_files):
+            files_already_present = False
+            break
+    
+    return files_already_present
+
 parser = argparse.ArgumentParser(
     description='A program to run fastq-dump sequentially on a list of '
     'accession numbers. Will automatically detect if reads are single- or '
@@ -371,6 +389,8 @@ parser.add_argument(
     default='all'
 )
 
+# small test SRA accs: SRR6853039 (single), SRR7658733 (paired)
+
 if len(sys.argv) == 1:
     sys.exit(parser.print_help())
 
@@ -428,12 +448,23 @@ for acc in accs:
         )
     else:
         read_type = 'single'
-    cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
-    dump_args = shlex.split(cmd)
-    print('[#] Running command \'{}\''.format(cmd), file=sys.stderr)
-    subprocess.run(dump_args)
-    # allow time for fastq-dump to print to stdout
-    time.sleep(2)
+    if read_type == 'paired':
+        paired_flag = True
+    else:
+        paired_flag = False
+    fq_present = fastq_exists(acc, paired=paired_flag)
+    if fq_present and not args.overwrite:
+        print(
+            '[!] Skipping fastq-dump on {} because existing FASTQ files found'
+            .format(acc)
+        )
+    else:
+        cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
+        dump_args = shlex.split(cmd)
+        print('[#] Running command \'{}\''.format(cmd), file=sys.stderr)
+        subprocess.run(dump_args)
+        # allow time for fastq-dump to print to stdout
+        time.sleep(2)
     if not args.keep_sra_files:
         if os.path.isfile(acc_filename):
             os.remove(acc_filename)
