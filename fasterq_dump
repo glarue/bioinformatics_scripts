@@ -208,17 +208,30 @@ def fetch_prefetch(acc):
 
 def fetch_direct(acc, protocols=['wget', 'curl']):
     fn = '{}.sra'.format(acc)
-    try:
-        sra_path = subprocess.run(
-            ['srapath', acc], 
-            check=True, 
-            stdout=subprocess.PIPE, 
-            universal_newlines=True
-        ).stdout.strip()
-    except FileNotFoundError: # utility not installed
+    total_retries = 2
+    sra_path = None
+    srapath_retry = 1
+    while srapath_retry <= total_retries and sra_path is None:
+        try:
+            sra_path = subprocess.run(
+                ['srapath', acc], 
+                check=True, 
+                stdout=subprocess.PIPE, 
+                universal_newlines=True
+            ).stdout.strip()
+        except: # utility not installed or srapath error
+            print(
+                '[!] Failed to resolve URL via srapath ({}/{})'
+                .format(srapath_retry, total_retries)
+            )
+            srapath_retry += 1
+            os.sleep(5)
+            continue
+    if sra_path is None:
         print(
             '[!] Unable to source srapath; using old-style URL construction',
-            file=sys.stderr)
+            file=sys.stderr
+        )
         sra_path = build_sra_path(acc)
     print('[#] SRA URL: {}'.format(sra_path), file=sys.stderr)
     downloaders = {
@@ -226,7 +239,6 @@ def fetch_direct(acc, protocols=['wget', 'curl']):
         'wget': ['-O', fn, sra_path]
     }
     ret_val = None
-    total_retries = 2
     for p in protocols:
         d_args = downloaders[p]
         d_cmds = [p] + d_args
