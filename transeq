@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 usage: transeq [-h] [-v {short,long}] [-p {1,2}] [-r] [-s STOP_CHARACTER]
-               [--no_mask]
+               [--no_mask] [--keep_whitespace]
                [sequence_input]
 
 Translate nucleotide sequence into amino acid sequence
@@ -24,6 +24,9 @@ optional arguments:
                         the string to use for stop codons (default: *)
   --no_mask             do not mask unrecognized codons with X; report
                         lowercased (default: False)
+  --keep_whitespace, -k
+                        treat whitespace (both bordering and internal) as
+                        sequence (default: False)
 
 """
 
@@ -51,7 +54,8 @@ def parse_seq(s):
         verbosity=v_level, 
         phase=phase_choice,
         stop_char=STOP_CHAR,
-        mask=MASK)
+        mask=MASK,
+        remove_whitespace=REMOVE_WHITESPACE)
     print(aas, flush=True)
 
 
@@ -67,14 +71,16 @@ def parse_file(seqFile):
 
     if isFasta:
         for h, s in fasta_parse(seqFile, separator=""):
+            s = s.strip()
             if rev_choice is True:
                 s = rev_comp(s)
             aas = translate(
                 s, 
-                verbosity=v_level, 
-                phase=phase_choice, 
+                verbosity=v_level,
+                phase=phase_choice,
                 stop_char=STOP_CHAR,
-                mask=MASK)
+                mask=MASK,
+                remove_whitespace=REMOVE_WHITESPACE)
             print(">" + h + "\t")
             print(aas, flush=True)
     else:
@@ -88,7 +94,8 @@ def parse_file(seqFile):
                     verbosity=v_level, 
                     phase=phase_choice, 
                     stop_char=STOP_CHAR,
-                    mask=MASK)
+                    mask=MASK,
+                    remove_whitespace=REMOVE_WHITESPACE)
                 print(aas, flush=True)
 
 parser = argparse.ArgumentParser(
@@ -133,6 +140,13 @@ parser.add_argument(
     action='store_true',
     help='do not mask unrecognized codons with X; report lowercased'
 )
+parser.add_argument(
+    '--keep_whitespace',
+    '-k',
+    help='treat whitespace (both bordering and internal) as sequence',
+    action='store_true',
+    default=False
+)
 
 args = parser.parse_args()
 
@@ -150,6 +164,7 @@ phase_choice = args.phase
 rev_choice = args.reverse_complement
 MASK = not args.no_mask
 STOP_CHAR = args.stop_character
+REMOVE_WHITESPACE = not args.keep_whitespace
 
 try:
     if os.path.isfile(seq_input):
