@@ -80,57 +80,61 @@ def get_transcripts(gff, child_type):
                 feat = GxfParse(line, ln)
             except TypeError:
                 continue
-            if feat.feat_type not in all_child_types:
-                info_dict = {
-                    'name': feat.name,
-                    'strand': feat.strand,
-                    # use transcript names as genes if no 
-                    # parent field in transcript
-                    'parent': feat.parent if feat.parent else feat.name,
-                    'coords': (feat.start, feat.stop),
-                    'region': feat.region,
-                    'inferred': False
-                }
-                if feat.name not in feature_info[feat.region]:
-                    feature_info[feat.region][feat.name] = info_dict
-                if feat.name in transcripts[feat.region]:  # made by child; update
-                    # don't override existing values with Nones
-                    updater = {k: v for k, v in info_dict.items() if v is not None}
-                    transcripts[feat.region][feat.name]['info'].update(updater)
-                else:
-                    transcripts[feat.region][feat.name] = {
-                        'info': info_dict,
-                        'children': set()}
-            elif feat.feat_type == child_type:
-                if not child_type_found:
-                    child_type_found = True
-                parent = feat.parent
-                if not parent:
-                    orphans += 1
-                    continue
-                start = feat.start
-                stop = feat.stop
-                region = feat.region
-                if parent not in transcripts[region]:
-                    try:
-                        parent_info = feature_info[region][parent]
-                    except KeyError:
-                        parent_info = {
-                            'strand': feat.strand,
-                            'region': region,
-                            'name': parent,
-                            'inferred': True,
-                            'parent': feat.grandparent,
-                            'coords': None,
+            parents = feat.parent if feat.parent else [feat.name]
+            for parent in parents:
+                if feat.feat_type not in all_child_types:
+                    info_dict = {
+                        'name': feat.name,
+                        'strand': feat.strand,
+                        # use transcript names as genes if no 
+                        # parent field in transcript
+                        'parent': parent,
+                        'coords': (feat.start, feat.stop),
+                        'region': feat.region,
+                        'inferred': False
+                    }
+                    if feat.name not in feature_info[feat.region]:
+                        feature_info[feat.region][feat.name] = info_dict
+                    if feat.name in transcripts[feat.region]:  # made by child; update
+                        # don't override existing values with Nones
+                        updater = {
+                            k: v for k, v in info_dict.items() 
+                            if v is not None
                         }
-                    transcripts[region][parent] = {
-                        'info': parent_info,
-                        'children': set()}
-                if feat.grandparent and parent not in grandparents[region]:
-                        grandparents[region][parent] = feat.grandparent
-                tr = transcripts[region][parent]
-                tr['children'].add(feat)
-                regions_with_content.add(region)
+                        transcripts[feat.region][feat.name]['info'].update(updater)
+                    else:
+                        transcripts[feat.region][feat.name] = {
+                            'info': info_dict,
+                            'children': set()}
+                elif feat.feat_type == child_type:
+                    if not child_type_found:
+                        child_type_found = True
+                    if not feat.parent:
+                        orphans += 1
+                        continue
+                    start = feat.start
+                    stop = feat.stop
+                    region = feat.region
+                    if parent not in transcripts[region]:
+                        try:
+                            parent_info = feature_info[region][parent]
+                        except KeyError:
+                            parent_info = {
+                                'strand': feat.strand,
+                                'region': region,
+                                'name': parent,
+                                'inferred': True,
+                                'parent': feat.grandparent,
+                                'coords': None,
+                            }
+                        transcripts[region][parent] = {
+                            'info': parent_info,
+                            'children': set()}
+                    if feat.grandparent and parent not in grandparents[region]:
+                            grandparents[region][parent] = feat.grandparent
+                    tr = transcripts[region][parent]
+                    tr['children'].add(feat)
+                    regions_with_content.add(region)
 
     if orphans:
         print('[#] Skipped {} orphan {} features'.format(
