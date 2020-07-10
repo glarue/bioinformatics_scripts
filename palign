@@ -348,7 +348,7 @@ def parallel_alignment(
     chunk.close()
     chunk_list = '\n'.join(chunked)    
     print('[#] Query split into {} files:\n{}\n'
-          .format(len(chunked), chunk_list))
+          .format(len(chunked), chunk_list), file=sys.stderr)
     if out_name is None:
         out_name = '{}-vs-{}.{}'.format(
             abbreviate(query), abbreviate(subject), output_suffix)
@@ -548,7 +548,7 @@ QUERY, SUBJECT = prep_run(
     QUERY, SUBJECT, ALIGNER, RUN_TYPE, no_format=NO_AUTO, overwrite=OVERWRITE)
 
 current_runtime = get_runtime(main_start_time)
-print('[#] Database prep finished in {}'.format(current_runtime))
+print('[#] Database prep finished in {}'.format(current_runtime), file=sys.stderr)
 
 if not SINGLE and PARALLEL > 1: #PARALLEL:
     # run multiple processes, and then join the output afterward
@@ -576,7 +576,7 @@ else:
         extra_args=EXTRA_ARGS)
 
 current_runtime = get_runtime(main_start_time)
-print( '[#] {} run finished in {}'.format(ALIGNER.upper(), current_runtime))
-print('[#] Results written to \'{}\''.format(OUT_NAME))
+print( '[#] {} run finished in {}'.format(ALIGNER.upper(), current_runtime), file=sys.stderr)
+print('[#] Results written to \'{}\''.format(OUT_NAME), file=sys.stderr)
 
 sys.exit(0)
