@@ -58,8 +58,7 @@ def demarcate(string, left_margin, right_margin, separator='|'):
     stringList = list(string)
     margins = [left_margin, -right_margin]
     for i in margins:
-        if i != 0:
-            stringList.insert(i, separator)
+        stringList.insert(i, separator)
     return "".join(stringList)
 
 
