@@ -200,7 +200,10 @@ def fetch_prefetch(acc):
     except:
         ret_code = 42
     if ret_code != 0:
-        print('[!] Downloading {} via prefetch failed'.format(acc))
+        print(
+            '[!] Downloading {} via prefetch failed'.format(acc), 
+            file=sys.stderr
+        )
         return None
     else:
         return fn
@@ -222,7 +225,7 @@ def fetch_direct(acc, protocols=['wget', 'curl']):
         except: # utility not installed or srapath error
             print(
                 '[!] Failed to resolve URL via srapath ({}/{})'
-                .format(srapath_retry, total_retries)
+                .format(srapath_retry, total_retries), file=sys.stderr
             )
             srapath_retry += 1
             time.sleep(5)
@@ -246,10 +249,10 @@ def fetch_direct(acc, protocols=['wget', 'curl']):
         while retry_n <= total_retries and ret_val is None:
             print(
                 '[#] Trying direct download ({}/{}): {}'.format(
-                    retry_n, total_retries, ' '.join(d_cmds)))
+                    retry_n, total_retries, ' '.join(d_cmds)), file=sys.stderr)
             ret_code = subprocess.run(d_cmds).returncode
             if ret_code != 0:
-                print('[!] Download command failed')
+                print('[!] Download command failed', file=sys.stderr)
                 retry_n += 1
                 ret_val = None
             else:
@@ -351,7 +354,7 @@ def fastq_exists(acc, paired=False):
     
     return files_already_present
 
-
+#TODO: remove previous log; add timestamp; add success/failure method(s)
 def write_log(logfn, acc, success=True):
     status = 'success'
     if success is not True:
@@ -477,7 +480,10 @@ for acc in accs:
     if '-X' not in extra_args:
         acc_filename = fetch_sra(acc, args.utilities, args.overwrite)
         if acc_filename is None:
-            print('[!] Could not fetch SRA file ({}); skipping.'.format(acc))
+            print(
+                '[!] Could not fetch SRA file ({}); skipping.'.format(acc), 
+                file=sys.stderr
+            )
         else:
             acc_success = True
             sra_files.append(acc_filename)
@@ -505,7 +511,7 @@ for acc in accs:
     if fq_present and not args.overwrite:
         print(
             '[!] Skipping fastq-dump on {} because existing FASTQ files found'
-            .format(acc)
+            .format(acc), file=sys.stderr
         )
     else:
         cmd = cmds[read_type] + acc_filename + ' ' + extra_arg_string
