@@ -225,7 +225,7 @@ def fetch_direct(acc, protocols=['wget', 'curl']):
                 .format(srapath_retry, total_retries)
             )
             srapath_retry += 1
-            os.sleep(5)
+            time.sleep(5)
             continue
     if sra_path is None:
         print(
@@ -351,6 +351,17 @@ def fastq_exists(acc, paired=False):
     
     return files_already_present
 
+
+def write_log(logfn, acc, success=True):
+    status = 'success'
+    if success is not True:
+        status = 'fail'
+    outbits = [acc, status]
+    with open(logfn, 'a') as log:
+        log.write('\t'.join(outbits) + '\n')
+    
+    return
+
 parser = argparse.ArgumentParser(
     description='A program to run fastq-dump sequentially on a list of '
     'accession numbers. Will automatically detect if reads are single- or '
@@ -412,6 +423,11 @@ parser.add_argument(
         '(default: all)'),
     default='all'
 )
+parser.add_argument(
+    '--log',
+    help=('create a log file with the success/failure status for each acc'),
+    action='store_true'
+)
 
 # small test SRA accs: SRR6853039 (single), SRR7658733 (paired)
 
@@ -454,16 +470,25 @@ extra_arg_string = ' '.join(extra_args)
 
 start_time = time.time()
 
+log_name = 'fasterq_dump.log'
+
 for acc in accs:
+    acc_success = False
     if '-X' not in extra_args:
         acc_filename = fetch_sra(acc, args.utilities, args.overwrite)
         if acc_filename is None:
-            sys.exit('[!] Could not fetch SRA file; exiting now.')
-        sra_files.append(acc_filename)
+            print('[!] Could not fetch SRA file ({}); skipping.'.format(acc))
+        else:
+            acc_success = True
+            sra_files.append(acc_filename)
+        if args.log:
+            write_log(log_name, acc, success=acc_success)
     else:
         # we don't want to pre-fetch SRA since we're
         # only getting a subset of the reads
         acc_filename = acc
+    if acc_filename is None:
+        continue
     read_type = paired_check(acc_filename)
     if read_type is not None:
         print(
