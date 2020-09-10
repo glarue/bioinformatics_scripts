@@ -105,7 +105,7 @@ def paired_check(acc):
         read_type = "single"
     else:
         print(
-            '[!] Read type ambiguous (read suffices: {})'.format(suffixes), 
+            '[!] Read type ambiguous (read suffixes: {})'.format(suffixes), 
             file=sys.stderr)
         read_type = None
 
