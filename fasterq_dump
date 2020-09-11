@@ -178,13 +178,13 @@ def local_sra_check(acc):
     else:
         return False
 
-
-def fetch_prefetch(acc):
+#TODO propagate quiet arg from argparse to this function call
+def fetch_prefetch(acc, quiet=True):
     fn = '{}.sra'.format(acc)
     cwd = os.getcwd()
     max_size_kb = '80000000'  # 80 GB
-    try:
-        ret_code = subprocess.run(
+    try: 
+        result = subprocess.run(
             [
                 'prefetch', 
                 acc, 
@@ -195,8 +195,12 @@ def fetch_prefetch(acc):
                 '-p', 
                 '--max-size', 
                 max_size_kb
-            ]
-        ).returncode
+            ],
+            stdout=subprocess.PIPE
+        )
+        ret_code = result.returncode
+        if not quiet:
+            print(result.stdout, file=sys.stderr)
     except:
         ret_code = 42
     if ret_code != 0:
