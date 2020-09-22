@@ -186,13 +186,13 @@ def fetch_prefetch(acc, quiet=True):
     try: 
         result = subprocess.run(
             [
-                'prefetch', 
-                acc, 
-                '-O', 
-                cwd, 
-                '-o', 
-                fn, 
-                '-p', 
+                'prefetch',
+                acc,
+                '-O',
+                cwd,
+                '-o',
+                fn,
+                '-p',
                 '--max-size', 
                 max_size_kb
             ],
